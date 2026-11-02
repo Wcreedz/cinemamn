@@ -5,7 +5,7 @@ import { HydratedDocument, Types } from 'mongoose';
 import { env } from '../config/env';
 import { IUser, RefreshSession, User } from '../models';
 import { randomToken, sha256 } from '../utils/crypto';
-import { AppError, unauthorized } from '../utils/errors';
+import { AppError, notFound, unauthorized } from '../utils/errors';
 import { SettingsService } from './settings.service';
 
 export const ACCESS_TTL_SECONDS = 15 * 60;
@@ -71,6 +71,16 @@ export const AuthService = {
     if (user.status === 'blocked') throw new AppError(403, 'ACCOUNT_BLOCKED', 'Таны бүртгэл хаагдсан байна. Админтай холбогдоно уу.');
     await User.updateOne({ _id: user._id }, { $set: { failedLoginAttempts: 0, lastLoginAt: new Date() }, $unset: { lockUntil: 1 } });
     return user;
+  },
+
+  // Зөвхөн энгийн хэрэглэгчид. Баталгаажуулалтгүй тул админ бүртгэлд хэзээ ч хамаарахгүй.
+  async resetUserPassword(phone: string, password: string) {
+    const user = await User.findOneAndUpdate(
+      { phone, role: 'user' },
+      { $set: { passwordHash: await hashPassword(password), failedLoginAttempts: 0 }, $unset: { lockUntil: 1 } },
+    );
+    if (!user) throw notFound('Энэ дугаараар бүртгэл олдсонгүй.');
+    await this.revokeUser(user._id);
   },
 
   // Тухайн хэрэглэгч аль хэдийн superadmin бол тоонд нэмэгдэхгүй.

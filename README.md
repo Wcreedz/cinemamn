@@ -28,4 +28,3 @@ npm run lint && npm run typecheck && npm run test && npm run build
 
 `frontend/`, `backend/`, `shared/`, `video-server/`, `infrastructure/`, `docs/`. Эхлэх: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), явц: [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 
-Анхны `index.html` бол өмнөх статик загвар бөгөөд энэ аппын нэг хэсэг биш.

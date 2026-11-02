@@ -21,6 +21,7 @@ api.get('/health', (_req, res) => {
 // Нэвтрэлт
 api.post('/auth/register', authLimiter, auth.register);
 api.post('/auth/login', authLimiter, auth.login);
+api.post('/auth/reset-password', authLimiter, auth.resetPassword);
 api.post('/auth/admin/login', authLimiter, auth.adminLogin);
 api.post('/auth/refresh', authLimiter, auth.refresh);
 api.post('/auth/logout', optionalAuth, auth.logout);

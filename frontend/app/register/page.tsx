@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
+import { PasswordInput } from '@/components/ui/password-input';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function RegisterPage() {
     <AuthShell title="Бүртгүүлэх">
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-        <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="off" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+        <div><Label htmlFor="password">Нууц үг</Label><PasswordInput id="password" autoComplete="off" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
         {error && <Notice tone="danger">{error}</Notice>}
         <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Үүсгэж байна…' : 'Бүртгэл үүсгэх'}</Button>
       </form>

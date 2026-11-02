@@ -2,7 +2,7 @@
 
 Бүх алдаа: `{ "error": { "code", "message", "details?" } }`. Жагсаалт: `{ items, total, page, limit, pages }`.
 
-**Нэвтрэлт**: `POST /api/auth/register { phone, password, name }`, `login` (хэрэглэгч, утсаар), `admin/login` (админ, имэйлээр), `change-password`, `logout`, `refresh`; `GET|PATCH /api/auth/me`
+**Нэвтрэлт**: `POST /api/auth/register { phone, password, name }`, `login` (хэрэглэгч, утсаар), `admin/login` (админ, имэйлээр), `change-password`, `reset-password { phone, password, confirmPassword }` (зөвхөн хэрэглэгч), `logout`, `refresh`; `GET|PATCH /api/auth/me`
 
 **Кино**: `GET /api/movies?category&year&sort&page&limit`, `/movies/featured`, `/movies/new`, `/movies/popular`, `/movies/:slug`, `/categories`, `/search?q=`
 

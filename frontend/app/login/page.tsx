@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
+import { PasswordInput } from '@/components/ui/password-input';
 
 function LoginForm() {
   const router = useRouter();
@@ -34,11 +35,11 @@ function LoginForm() {
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-4">
       <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required pattern="[+0-9 ()\-]+" title="Утасны дугаараа оруулна уу" placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-      <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+      <div><Label htmlFor="password">Нууц үг</Label><PasswordInput id="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
       {error && <Notice tone="danger">{error}</Notice>}
       <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Нэвтэрч байна…' : 'Нэвтрэх'}</Button>
       <p className="text-sm text-muted-foreground">Бүртгэлгүй юу? <Link href="/register" className="text-primary hover:underline">Бүртгүүлэх</Link></p>
-      <p className="text-xs text-muted-foreground">Нууц үгээ мартсан бол админд хандана уу.</p>
+      <p className="text-sm"><Link href="/forgot-password" className="text-muted-foreground hover:underline">Нууц үг солих</Link></p>
     </form>
   );
 }

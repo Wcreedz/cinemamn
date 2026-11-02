@@ -4,7 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { unauthorized } from '../utils/errors';
 import { clientIp, parse } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
-import { adminLoginSchema, changePasswordSchema, loginSchema, profileSchema, registerSchema } from '../validators';
+import { adminLoginSchema, changePasswordSchema, loginSchema, profileSchema, registerSchema, resetPasswordSchema } from '../validators';
 
 const meta = (req: Request) => ({ ip: clientIp(req), userAgent: req.headers['user-agent'] });
 
@@ -32,6 +32,12 @@ export async function adminLogin(req: Request, res: Response) {
   const user = await AuthService.loginAdmin(email, password);
   await startSession(req, res, user, remember);
   res.json({ user: AuthService.view(user) });
+}
+
+export async function resetPassword(req: Request, res: Response) {
+  const { phone, password } = parse(resetPasswordSchema, req.body);
+  await AuthService.resetUserPassword(normalizePhone(phone), password);
+  res.json({ ok: true });
 }
 
 export async function refresh(req: Request, res: Response) {

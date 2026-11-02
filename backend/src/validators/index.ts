@@ -10,6 +10,8 @@ export const registerSchema = z.object({ phone: phoneField, password: passwordFi
 export const loginSchema = z.object({ phone: phoneField, password: z.string().min(1).max(128) });
 export const emailField = z.string().trim().toLowerCase().max(254).email('Имэйл хаяг буруу байна');
 export const adminLoginSchema = z.object({ email: emailField, password: z.string().min(1).max(128), remember: z.boolean().default(false) });
+export const resetPasswordSchema = z.object({ phone: phoneField, password: passwordField, confirmPassword: z.string() })
+  .refine((v) => v.password === v.confirmPassword, { path: ['confirmPassword'], message: 'Нууц үг таарахгүй байна.' });
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: passwordField });
 export const profileSchema = z.object({ name: z.string().trim().max(80) });
 

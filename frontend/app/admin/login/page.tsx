@@ -1,13 +1,13 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
 import type { PublicUser } from '@mongolflix/shared';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
+import { PasswordInput } from '@/components/ui/password-input';
 
 const Required = () => <span className="text-destructive" aria-hidden>*</span>;
 
@@ -16,7 +16,6 @@ export default function AdminLoginPage() {
   const { user, setUser, settings } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,12 +48,7 @@ export default function AdminLoginPage() {
           </div>
           <div>
             <Label htmlFor="password">Нууц үг<Required /></Label>
-            <div className="flex overflow-hidden rounded-md border border-input">
-              <Input id="password" type={show ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="rounded-none border-0" />
-              <button type="button" aria-label={show ? 'Нууц үгийг нуух' : 'Нууц үгийг харуулах'} aria-pressed={show} onClick={() => setShow(!show)} className="flex w-11 shrink-0 cursor-pointer items-center justify-center border-l text-muted-foreground hover:text-foreground">
-                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
+            <PasswordInput id="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <input type="checkbox" className="size-4 accent-[#16a34a]" checked={remember} onChange={(e) => setRemember(e.target.checked)} />

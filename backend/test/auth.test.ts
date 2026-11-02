@@ -68,8 +68,41 @@ describe('Нэвтрэлт', () => {
     expect(u!.email).toBeUndefined();
   });
 
+  it('хэрэглэгч утас, шинэ нууц үгээр нууц үгээ сольж, хуучин сешн хаагдана', async () => {
+    const { agent, phone, password } = await login();
+    const res = await api().post('/api/auth/reset-password').send({ phone, password: 'Шинэ1', confirmPassword: 'Шинэ1' });
+    expect(res.status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone, password })).status).toBe(401);
+    expect((await api().post('/api/auth/login').send({ phone, password: 'Шинэ1' })).status).toBe(200);
+    expect((await agent.post('/api/auth/refresh')).status).toBe(401);
+  });
+
+  it('нууц үг солих: давталт таарахгүй, бүртгэлгүй дугаарыг татгалзана', async () => {
+    const { phone } = await login();
+    const mismatch = await api().post('/api/auth/reset-password').send({ phone, password: 'a', confirmPassword: 'b' });
+    expect(mismatch.status).toBe(400);
+    expect(mismatch.body.error.message).toBe('Нууц үг таарахгүй байна.');
+    expect((await api().post('/api/auth/reset-password').send({ phone: '88000000', password: 'a', confirmPassword: 'a' })).status).toBe(404);
+  });
+
+  it('админы нууц үгийг энэ замаар солих боломжгүй', async () => {
+    for (const role of ['admin', 'superadmin'] as const) {
+      const { phone, email, password } = await login(role);
+      expect((await api().post('/api/auth/reset-password').send({ phone, password: 'hacked', confirmPassword: 'hacked' })).status).toBe(404);
+      expect((await api().post('/api/auth/admin/login').send({ email, password })).status).toBe(200);
+      expect((await api().post('/api/auth/admin/login').send({ email, password: 'hacked' })).status).toBe(401);
+    }
+  });
+
+  it('блоклогдсон хэрэглэгч нууц үг солиод ч нэвтрэхгүй', async () => {
+    const { user, phone } = await login();
+    await User.updateOne({ _id: user._id }, { $set: { status: 'blocked' } });
+    expect((await api().post('/api/auth/reset-password').send({ phone, password: 'x', confirmPassword: 'x' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone, password: 'x' })).status).toBe(403);
+  });
+
   it('SMS, OTP-ийн замууд байхгүй', async () => {
-    for (const url of ['/api/auth/send-otp', '/api/auth/verify-otp', '/api/auth/reset-password']) {
+    for (const url of ['/api/auth/send-otp', '/api/auth/verify-otp']) {
       expect((await api().post(url).send({})).status).toBe(404);
     }
     const { agent } = await login('superadmin');
