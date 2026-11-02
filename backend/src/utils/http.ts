@@ -6,7 +6,9 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
   const r = schema.safeParse(data);
   if (!r.success) {
     const details = r.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
-    throw new AppError(400, 'VALIDATION_ERROR', 'Оруулсан мэдээлэл буруу байна.', details);
+    // Монгол тайлбартай эхний алдааг харуулж, хэрэглэгч юуг засахаа мэднэ.
+    const message = details.find((d) => /[а-яөү]/i.test(d.message))?.message ?? 'Оруулсан мэдээлэл буруу байна.';
+    throw new AppError(400, 'VALIDATION_ERROR', message, details);
   }
   return r.data;
 }

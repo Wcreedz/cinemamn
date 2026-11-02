@@ -246,7 +246,7 @@ export function AdminsTab() {
           <Field label="Имэйл" hint="Нэвтрэхэд ашиглана."><Input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
           <Field label="Утас"><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
           <Field label="Нэр"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-          <Field label="Нууц үг" hint="Бүртгэлтэй хэрэглэгчид шаардлагагүй."><Input type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
+          <Field label="Нууц үг" hint="Бүртгэлтэй хэрэглэгчид шаардлагагүй."><Input type="password" autoComplete="off" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
           <Field label="Эрх"><Select value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}><option value="admin">Admin</option><option value="superadmin">Superadmin</option></Select></Field>
         </div>
         <Feedback msg={msg} />

@@ -33,7 +33,7 @@ export default function RegisterPage() {
     <AuthShell title="Бүртгүүлэх">
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-        <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+        <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="off" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
         {error && <Notice tone="danger">{error}</Notice>}
         <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Үүсгэж байна…' : 'Бүртгэл үүсгэх'}</Button>
       </form>

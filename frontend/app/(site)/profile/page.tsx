@@ -55,7 +55,7 @@ function ChangePassword() {
       <h2 className="mb-4 font-bold">Нууц үг солих</h2>
       <form onSubmit={(e) => void save(e)} className="space-y-4">
         <div><Label htmlFor="current">Одоогийн нууц үг</Label><Input id="current" type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
-        <div><Label htmlFor="next">Шинэ нууц үг</Label><Input id="next" type="password" autoComplete="new-password" required value={next} onChange={(e) => setNext(e.target.value)} /></div>
+        <div><Label htmlFor="next">Шинэ нууц үг</Label><Input id="next" type="password" autoComplete="off" required value={next} onChange={(e) => setNext(e.target.value)} /></div>
         {msg && <Notice tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Notice>}
         <Button type="submit">Солих</Button>
       </form>

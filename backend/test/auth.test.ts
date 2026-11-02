@@ -46,6 +46,19 @@ describe('Нэвтрэлт', () => {
     expect((await api().post('/api/auth/register').send({ phone: '99112255' })).status).toBe(400);
   });
 
+  it('алдаа юуг засахыг Монголоор хэлнэ', async () => {
+    const noPassword = await api().post('/api/auth/register').send({ phone: '99112288', password: '' });
+    expect(noPassword.status).toBe(400);
+    expect(noPassword.body.error.message).toBe('Нууц үгээ оруулна уу.');
+    const noPhone = await api().post('/api/auth/register').send({ password: 'x' });
+    expect(noPhone.body.error.message).toBe('Утасны дугаараа оруулна уу.');
+    const shortPhone = await api().post('/api/auth/register').send({ phone: '123', password: 'x' });
+    expect(shortPhone.body.error.message).toContain('8 оронтой');
+    const taken = await api().post('/api/auth/register').send({ phone: '99112288', password: 'x' });
+    expect(taken.status).toBe(201);
+    expect((await api().post('/api/auth/register').send({ phone: '99112288', password: 'x' })).body.error.message).toContain('бүртгэл үүссэн');
+  });
+
   it('бүртгэлээр эрх, төлөв өөрчилж чадахгүй', async () => {
     const res = await api().post('/api/auth/register').send({ phone: '99112266', password: 'Strong-pass-1', role: 'superadmin', status: 'blocked', email: 'x@example.com' });
     expect(res.status).toBe(201);

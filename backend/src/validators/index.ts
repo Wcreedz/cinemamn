@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { objectId } from '../utils/http';
 
-export const phoneField = z.string().trim().min(8).max(20);
+const PHONE_ERROR = 'Утасны дугаар буруу байна. 8 оронтой Монгол дугаар оруулна уу.';
+export const phoneField = z.string({ error: 'Утасны дугаараа оруулна уу.' }).trim().min(8, PHONE_ERROR).max(20, PHONE_ERROR);
 // Урт, бүтцийн шаардлага тавихгүй. Дээд хязгаар нь хэт урт утгаар hash-ийг ачааллуулахаас сэргийлнэ.
-export const passwordField = z.string().min(1, 'Нууц үгээ оруулна уу').max(128);
+export const passwordField = z.string({ error: 'Нууц үгээ оруулна уу.' }).min(1, 'Нууц үгээ оруулна уу.').max(128, 'Нууц үг хэт урт байна.');
 
 export const registerSchema = z.object({ phone: phoneField, password: passwordField, name: z.string().trim().max(80).default('') });
 export const loginSchema = z.object({ phone: phoneField, password: z.string().min(1).max(128) });
