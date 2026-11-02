@@ -9,7 +9,7 @@ import { Input, Textarea } from '@/components/ui/input';
 import { Badge, Notice } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
 import { useApi } from '@/hooks/use-api';
-import { api } from '@/lib/api';
+import { api, API_BASE } from '@/lib/api';
 
 const VIDEO_LABELS: Record<string, string> = { none: 'Видеогүй', uploading: 'Байршуулж байна', queued: 'Дараалалд', processing: 'Боловсруулж байна', ready: 'Бэлэн', failed: 'Алдаатай' };
 
@@ -85,7 +85,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     const form = new FormData();
     form.append('video', file);
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `/api/admin/movies/${movie.id}/upload`);
+    xhr.open('POST', `${API_BASE}/api/admin/movies/${movie.id}/upload`);
     xhr.withCredentials = true;
     xhr.upload.onprogress = (e) => setProgress(e.lengthComputable ? e.loaded / e.total : null);
     xhr.onloadend = () => {

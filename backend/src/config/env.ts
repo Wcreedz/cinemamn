@@ -13,7 +13,7 @@ const schema = z.object({
   QPAY_MONGODB_URI: z.string().optional(),
   // quickqpaypackv2 энэ хувьсагчаас QPay серверийн хаягийг уншдаг.
   QPAY_MERCHANT_SERVER: z.string().url().optional(),
-  // API-н гаднаас хандах хаяг (жишээ нь https://zzzcinema.mn/api). QPay callback эндээс бүтнэ.
+  // API-н гаднаас хандах хаяг (жишээ нь http://103.236.194.46/api). QPay callback эндээс бүтнэ.
   UNDSEN_SERVER: z.string().url().optional(),
   QPAY_CHECK_RETRIES: z.coerce.number().int().min(1).default(3),
   QPAY_CHECK_RETRY_DELAY_MS: z.coerce.number().int().min(0).default(3000),

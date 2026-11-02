@@ -1,5 +1,9 @@
 import type { ApiError } from '@mongolflix/shared';
 
+// Вэб ба API тусдаа хост дээр байвал хөтөч API руу шууд хандана. Ингэснээр прокси дамжихгүй:
+// жинхэнэ IP хадгалагдаж, том файлын хэмжээний хязгаарт орохгүй. Хоосон бол ижил origin.
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
+
 export class ApiClientError extends Error {
   constructor(message: string, public status: number, public code: string, public details?: unknown) {
     super(message);
@@ -9,12 +13,12 @@ export class ApiClientError extends Error {
 interface Options { method?: string; body?: unknown; form?: FormData; retry?: boolean }
 
 let refreshing: Promise<boolean> | null = null;
-const refresh = () => (refreshing ??= fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+const refresh = () => (refreshing ??= fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
   .then((r) => r.ok).catch(() => false).finally(() => { refreshing = null; }));
 
 // Access cookie дууссан бол refresh хийж хүсэлтийг нэг удаа давтана.
 export async function api<T = unknown>(path: string, opts: Options = {}): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: opts.method ?? (opts.body || opts.form ? 'POST' : 'GET'),
     credentials: 'include',
     headers: opts.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,

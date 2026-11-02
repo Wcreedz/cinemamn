@@ -10,6 +10,8 @@ const config: NextConfig = {
     return [
       { source: '/api/:path*', destination: `${apiUrl}/api/:path*` },
       { source: '/media/:path*', destination: `${apiUrl}/media/:path*` },
+      // API нь HTTPS-гүй үед HTTPS хуудаснаас видео блоклогдохгүйн тулд ижил origin-оор дамжуулна.
+      { source: '/v/:path*', destination: `${apiUrl}/v/:path*` },
     ];
   },
   async headers() {

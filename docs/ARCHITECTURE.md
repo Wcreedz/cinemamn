@@ -1,8 +1,8 @@
 # Архитектур
 
 ```
-Хөтөч ──▶ Nginx ──┬─▶ web (Next.js)  : хуудсууд, /api-г API руу дамжуулна
-                  ├─▶ api (Express)  : REST, /api/*
+Хөтөч ──▶ Vercel: web (Next.js)
+Vercel ──▶ Nginx (VPS) ──┬─▶ api (Express) : REST, /api/*
                   └─▶ /v/<токен>/<кино>/<файл> ── auth_request ──▶ api /internal/stream/verify
                          └─ зөвшөөрвөл /srv/mongolflix/hls-с шууд өгнө
 worker (Node) ── FFmpeg ──▶ /srv/mongolflix/hls        MongoDB

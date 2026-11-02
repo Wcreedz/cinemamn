@@ -147,6 +147,21 @@ describe('Нэвтрэлт', () => {
     expect(res.status).toBe(400);
   });
 
+  it('зөвшөөрөгдсөн өөр хостын вэб cookie-тэй хандаж чадна', async () => {
+    const { phone, password } = await login();
+    const web = 'http://localhost:3110';
+    const preflight = await api().options('/api/auth/login').set('Origin', web).set('Access-Control-Request-Method', 'POST').set('Access-Control-Request-Headers', 'content-type');
+    expect(preflight.status).toBeLessThan(300);
+    expect(preflight.headers['access-control-allow-origin']).toBe(web);
+    expect(preflight.headers['access-control-allow-credentials']).toBe('true');
+    const res = await api().post('/api/auth/login').set('Origin', web).send({ phone, password });
+    expect(res.status).toBe(200);
+    expect(res.headers['access-control-allow-origin']).toBe(web);
+    expect(res.headers['access-control-allow-credentials']).toBe('true');
+    const evil = await api().options('/api/auth/login').set('Origin', 'https://evil.example').set('Access-Control-Request-Method', 'POST');
+    expect(evil.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('зөвшөөрөгдөөгүй Origin-ээс ирсэн POST-г хаана', async () => {
     const res = await api().post('/api/auth/login').set('Origin', 'https://evil.example').send({ phone: '99112233', password: 'x' });
     expect(res.status).toBe(403);

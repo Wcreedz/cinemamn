@@ -10,7 +10,7 @@ QPay-н бүх дуудлага [quickqpaypackv2](../backend/src/services/qpay.g
 
 ```ini
 QPAY_MERCHANT_SERVER=https://quickqr.qpay.mn/
-UNDSEN_SERVER=https://zzzcinema.mn/api
+UNDSEN_SERVER=http://103.236.194.46/api
 ```
 
 Аль нэг нь дутуу бол `POST /payments/qpay/create` 503 буцаана. `QpayKhariltsagch`, `token` өөр баазад байвал `QPAY_MONGODB_URI`-г заана.
