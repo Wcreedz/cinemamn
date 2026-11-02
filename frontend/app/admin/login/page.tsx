@@ -8,15 +8,16 @@ import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { PasswordInput } from '@/components/ui/password-input';
+import { RememberMe } from '@/components/ui/remember-me';
+import { useRememberedLogin } from '@/hooks/use-remembered-login';
 
 const Required = () => <span className="text-destructive" aria-hidden>*</span>;
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const { user, setUser, settings } = useApp();
-  const [email, setEmail] = useState('');
+  const { login: email, setLogin: setEmail, remember, setRemember, saveLogin } = useRememberedLogin('mf_login_email');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,6 +30,7 @@ export default function AdminLoginPage() {
     setBusy(true); setError(null);
     try {
       const r = await api<{ user: PublicUser }>('/api/auth/admin/login', { body: { email, password, remember } });
+      saveLogin();
       setUser(r.user);
     } catch (err) {
       setError((err as Error).message);
@@ -50,10 +52,7 @@ export default function AdminLoginPage() {
             <Label htmlFor="password">Нууц үг<Required /></Label>
             <PasswordInput id="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <input type="checkbox" className="size-4 accent-[#16a34a]" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            Намайг сануул
-          </label>
+          <RememberMe checked={remember} onChange={setRemember} />
           {error && <Notice tone="danger">{error}</Notice>}
           <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Нэвтэрч байна…' : 'Нэвтрэх'}</Button>
         </form>

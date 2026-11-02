@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Clapperboard, Crown, Film, Home, LayoutGrid, LogOut, Search, Shield, User } from 'lucide-react';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
@@ -16,11 +16,33 @@ const LINKS = [
   { href: '/profile', label: 'Профайл', icon: User },
 ];
 
+const SEARCH_DELAY_MS = 300;
+
 export function SiteNav() {
   const path = usePathname();
   const router = useRouter();
   const { user, loading, settings, logout } = useApp();
   const [q, setQ] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Хайлтын хуудас руу шууд орсон бол үгийг хаягаас авч, бусад хуудсанд очвол цэвэрлэнэ.
+  useEffect(() => {
+    clearTimeout(timer.current);
+    setQ(path === '/search' ? new URLSearchParams(window.location.search).get('q') ?? '' : '');
+  }, [path]);
+
+  const goSearch = (value: string) => {
+    const term = value.trim();
+    const url = term ? `/search?q=${encodeURIComponent(term)}` : '/search';
+    // Үсэг бүр түүхэнд үлдэхгүй: Буцах товч хайлтын өмнөх хуудас руу очно.
+    if (window.location.pathname === '/search') router.replace(url);
+    else if (term) router.push(url);
+  };
+  const onSearchChange = (value: string) => {
+    setQ(value);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => goSearch(value), SEARCH_DELAY_MS);
+  };
   const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
   const siteName = settings?.general.siteName ?? 'MongolFlix';
 
@@ -39,10 +61,10 @@ export function SiteNav() {
               </Link>
             ))}
           </nav>
-          <form role="search" className="ml-auto flex min-w-0 max-w-xs flex-1 justify-end" onSubmit={(e) => { e.preventDefault(); if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`); }}>
+          <form role="search" className="ml-auto flex min-w-0 max-w-xs flex-1 justify-end" onSubmit={(e) => { e.preventDefault(); clearTimeout(timer.current); goSearch(q); }}>
             <div className="relative w-full">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input aria-label="Кино хайх" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Хайх…" className="h-9 w-full rounded-full border bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground" />
+              <input aria-label="Кино хайх" value={q} onChange={(e) => onSearchChange(e.target.value)} placeholder="Хайх…" className="h-9 w-full rounded-full border bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground" />
             </div>
           </form>
           {!loading && (user ? (

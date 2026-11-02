@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { BarChart3, CreditCard, Crown, Film, History, LayoutGrid, Menu, Settings, Users, X } from 'lucide-react';
+import { BarChart3, CreditCard, Crown, Film, Globe, History, LayoutGrid, LogOut, Menu, Settings, Users, X } from 'lucide-react';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/misc';
@@ -27,7 +27,8 @@ const GROUPS = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { user, loading, settings } = useApp();
+  const router = useRouter();
+  const { user, loading, settings, logout } = useApp();
   const [open, setOpen] = useState(false);
   const active = (href: string) => (href === '/admin' ? path === '/admin' : path.startsWith(href));
   // Нэвтрэх хуудас нь цэс, эрхийн шалгалтгүй, зөвхөн theme-ийг өвлөнө.
@@ -44,12 +45,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-card px-4">
         <button aria-label={open ? 'Цэс хаах' : 'Цэс нээх'} className="cursor-pointer lg:hidden" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
         <Link href="/admin" className="text-xl font-black text-primary">{settings?.general.siteName ?? 'MongolFlix'} <span className="text-xs font-semibold uppercase text-muted-foreground">Админ</span></Link>
-        <div className="ml-auto flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm">
-          <span className="size-2 rounded-full bg-success" aria-hidden />
-          <span className="font-semibold">{user?.email ?? user?.phone}</span>
-          {user && <span className="text-xs text-muted-foreground">{user.role}</span>}
+        <div className="ml-auto flex items-center gap-2">
+          {user && (
+            <div className="hidden items-center gap-2 rounded-xl border px-3 py-1.5 text-sm sm:flex">
+              <span className="size-2 rounded-full bg-success" aria-hidden />
+              <span className="font-semibold">{user.email ?? user.phone}</span>
+              <span className="text-xs text-muted-foreground">{user.role}</span>
+            </div>
+          )}
+          <Button asChild variant="outline" size="sm"><Link href="/" aria-label="Сайт руу очих"><Globe /><span className="hidden sm:inline">Сайт руу очих</span></Link></Button>
+          {user && (
+            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive hover:text-white" aria-label="Гарах" onClick={() => void logout().then(() => router.push('/admin/login'))}>
+              <LogOut /><span className="hidden sm:inline">Гарах</span>
+            </Button>
+          )}
         </div>
-        <Button asChild variant="ghost" size="sm"><Link href="/">Сайт</Link></Button>
       </header>
       <div className="flex">
         <aside className={cn('fixed inset-y-16 left-0 z-20 w-64 overflow-y-auto border-r bg-card p-4 transition-transform lg:sticky lg:top-16 lg:h-[calc(100dvh-4rem)] lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>

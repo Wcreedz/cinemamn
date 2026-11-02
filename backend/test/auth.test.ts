@@ -159,7 +159,7 @@ describe('Нэвтрэлт', () => {
     expect((await api().post('/api/auth/admin/login').send({ email, password })).status).toBe(429);
   });
 
-  it('"Намайг сануул" сонгоогүй бол refresh cookie нь сешн хугацаатай, rotation-д ч хэвээр', async () => {
+  it('"Намайг сана" сонгоогүй бол refresh cookie нь сешн хугацаатай, rotation-д ч хэвээр', async () => {
     const { email, password } = await login('admin');
     const refreshCookie = (r: request.Response) => ([] as string[]).concat(r.headers['set-cookie']).find((c) => c.startsWith('mf_refresh='))!;
     const agent = request.agent(app);

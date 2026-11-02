@@ -7,8 +7,9 @@ import { EmptyState, ErrorState } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
 
 function Results() {
-  const q = useSearchParams().get('q') ?? '';
+  const q = (useSearchParams().get('q') ?? '').trim();
   const { data, error, loading, reload } = useApi<Paginated<MovieSummary>>(q ? `/api/search?q=${encodeURIComponent(q)}` : null);
+  if (!q) return <EmptyState title="Хайх үгээ бичнэ үү">Киноны нэрээр хайна.</EmptyState>;
   return (
     <>
       <h1 className="mb-5 text-2xl font-black">“{q}” хайлтын үр дүн</h1>
