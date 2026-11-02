@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+.next/
+out/
+*.tsbuildinfo
+coverage/
+*.log
+video-server/storage/*
+!video-server/storage/.gitkeep
+backups/
+.DS_Store
+next-env.d.ts
+logs/

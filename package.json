@@ -1,0 +1,23 @@
+{
+  "name": "mongolflix",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["shared", "backend", "frontend"],
+  "engines": { "node": ">=20.9" },
+  "scripts": {
+    "dev": "concurrently -n api,web,video \"npm run dev -w backend\" \"npm run dev -w frontend\" \"npm run worker:dev -w backend\"",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "admin:bootstrap": "npm run admin:bootstrap -w backend --",
+    "seed:categories": "npm run seed:categories -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "zevbackv2": "http://103.236.194.68:4873/zevbackv2/-/zevbackv2-1.1.87.tgz"
+  }
+}
