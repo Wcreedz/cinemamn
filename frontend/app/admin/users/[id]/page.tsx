@@ -52,8 +52,8 @@ export default function AdminUserDetail() {
           <h2 className="mb-3 font-bold">Нууц үг шинэчлэх</h2>
           <p className="mb-3 text-xs text-muted-foreground">Хэрэглэгч нууц үгээ мартсан үед. Хуучин бүх сешн хаагдаж, түгжээ арилна.</p>
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <Field label="Шинэ нууц үг" hint="Дор хаяж 8 тэмдэгт."><Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
-            <Button disabled={password.length < 8} onClick={() => void act(() => api(`/api/admin/users/${id}/password`, { method: 'PATCH', body: { password } }), 'Нууц үг шинэчлэгдлээ.').then(() => setPassword(''))}>Шинэчлэх</Button>
+            <Field label="Шинэ нууц үг"><Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+            <Button disabled={!password} onClick={() => void act(() => api(`/api/admin/users/${id}/password`, { method: 'PATCH', body: { password } }), 'Нууц үг шинэчлэгдлээ.').then(() => setPassword(''))}>Шинэчлэх</Button>
           </div>
         </Panel>
       </div>

@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { objectId } from '../utils/http';
 
 export const phoneField = z.string().trim().min(8).max(20);
-export const passwordField = z.string().min(8, 'Нууц үг дор хаяж 8 тэмдэгт байна').max(128);
+// Урт, бүтцийн шаардлага тавихгүй. Дээд хязгаар нь хэт урт утгаар hash-ийг ачааллуулахаас сэргийлнэ.
+export const passwordField = z.string().min(1, 'Нууц үгээ оруулна уу').max(128);
 
 export const registerSchema = z.object({ phone: phoneField, password: passwordField, name: z.string().trim().max(80).default('') });
 export const loginSchema = z.object({ phone: phoneField, password: z.string().min(1).max(128) });

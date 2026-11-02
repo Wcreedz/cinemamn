@@ -1,17 +1,14 @@
-// Анхны Superadmin үүсгэнэ. Нууц үг кодод бичигдэхгүй: ADMIN_BOOTSTRAP_PASSWORD эсвэл stdin-ээс уншина.
+// Superadmin үүсгэнэ (дээд тал нь 3). Нууц үг кодод бичигдэхгүй: ADMIN_BOOTSTRAP_PASSWORD эсвэл stdin-ээс уншина.
 // Хэрэглээ: npm run admin:bootstrap -- <имэйл> <утас> [нэр]
-// Имэйлгүй үлдсэн superadmin (өмнөх хувилбараас) байвал түүнд имэйл, нууц үг онооно.
+// Тухайн утастай хэрэглэгч байвал түүнд имэйл, нууц үг онооно.
 import readline from 'readline';
 import mongoose from 'mongoose';
 import { connectDb } from '../config/db';
 import { User } from '../models';
-import { hashPassword } from '../services/auth.service';
+import { AuthService, hashPassword } from '../services/auth.service';
 import { parse } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
 import { emailField } from '../validators';
-
-const MIN_LENGTH = 4;
-const RECOMMENDED_LENGTH = 12;
 
 async function readPassword() {
   if (process.env.ADMIN_BOOTSTRAP_PASSWORD) return process.env.ADMIN_BOOTSTRAP_PASSWORD;
@@ -32,13 +29,15 @@ async function main() {
   const email = parse(emailField, emailArg);
   const phone = normalizePhone(phoneArg);
   await connectDb();
-  if (await User.exists({ role: 'superadmin', email: { $type: 'string' } })) throw new Error('Superadmin аль хэдийн байна. Нэмэлт админыг /admin/settings дээрээс үүсгэнэ үү.');
+  const existing = await User.findOne({ phone }).select('_id').lean();
+  await AuthService.assertSuperadminSlot(existing?._id);
+  const emailOwner = await User.findOne({ email }).select('_id').lean();
+  if (emailOwner && String(emailOwner._id) !== String(existing?._id)) throw new Error('Энэ имэйлийг өөр хэрэглэгч ашиглаж байна.');
   const password = await readPassword();
-  if (password.length < MIN_LENGTH) throw new Error(`Нууц үг дор хаяж ${MIN_LENGTH} тэмдэгт байх ёстой.`);
+  if (!password) throw new Error('Нууц үгээ оруулна уу.');
   const passwordHash = await hashPassword(password);
   await User.findOneAndUpdate({ phone }, { $set: { role: 'superadmin', email, passwordHash, status: 'active', name } }, { upsert: true, runValidators: true });
   console.info(`Superadmin бэлэн: ${email}`);
-  if (password.length < RECOMMENDED_LENGTH) console.warn(`АНХААР: нууц үг ${RECOMMENDED_LENGTH} тэмдэгтээс богино байна. Нэвтэрсний дараа Профайл хэсгээс солино уу.`);
 }
 
 main()

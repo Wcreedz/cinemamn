@@ -13,6 +13,7 @@ const ARGON = { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallel
 const INVALID_LOGIN = 'Утасны дугаар эсвэл нууц үг буруу байна.';
 const INVALID_ADMIN_LOGIN = 'Имэйл эсвэл нууц үг буруу байна.';
 const SHORT_SESSION_DAYS = 1;
+export const MAX_SUPERADMINS = 3;
 
 // Хэрэглэгч олдоогүй үед ч ижил хугацаа зарцуулж дугаар бүртгэлтэй эсэхийг нуух dummy hash.
 const dummyHash = argon2.hash(crypto.randomBytes(16).toString('hex'), ARGON);
@@ -70,6 +71,12 @@ export const AuthService = {
     if (user.status === 'blocked') throw new AppError(403, 'ACCOUNT_BLOCKED', 'Таны бүртгэл хаагдсан байна. Админтай холбогдоно уу.');
     await User.updateOne({ _id: user._id }, { $set: { failedLoginAttempts: 0, lastLoginAt: new Date() }, $unset: { lockUntil: 1 } });
     return user;
+  },
+
+  // Тухайн хэрэглэгч аль хэдийн superadmin бол тоонд нэмэгдэхгүй.
+  async assertSuperadminSlot(userId?: Types.ObjectId) {
+    const others = await User.countDocuments({ role: 'superadmin', ...(userId ? { _id: { $ne: userId } } : {}) });
+    if (others >= MAX_SUPERADMINS) throw new AppError(409, 'SUPERADMIN_LIMIT', `Superadmin дээд тал нь ${MAX_SUPERADMINS} байна.`);
   },
 
   // Амжилттай бол бусад бүх төхөөрөмжийн сешн хаагдана.

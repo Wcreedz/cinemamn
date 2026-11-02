@@ -113,6 +113,7 @@ export async function createAdmin(req: Request, res: Response) {
   const b = parse(adminCreateSchema, req.body);
   const phone = normalizePhone(b.phone);
   let user = await User.findOne({ phone });
+  if (b.role === 'superadmin') await AuthService.assertSuperadminSlot(user?._id);
   if (user) {
     user.role = b.role;
     user.email = b.email;
@@ -133,6 +134,7 @@ export async function setAdminRole(req: Request, res: Response) {
   if (target.role === 'superadmin' && role !== 'superadmin' && (await User.countDocuments({ role: 'superadmin', status: 'active' })) <= 1) {
     throw conflict('Сүүлчийн Superadmin-ы эрхийг хасах боломжгүй.');
   }
+  if (role === 'superadmin') await AuthService.assertSuperadminSlot(id);
   // Админ зөвхөн имэйлээр нэвтэрдэг тул имэйлгүй хүнийг дэвшүүлбэл нэвтэрч чадахгүй болно.
   if (role !== 'user' && !target.email) throw badRequest('Энэ хэрэглэгчид имэйл алга. "Админ нэмэх" хэсгээс имэйлтэй нь нэмнэ үү.');
   const before = target.role;

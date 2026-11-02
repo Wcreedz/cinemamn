@@ -124,7 +124,7 @@ describe('Админ удирдлага', () => {
     const t = await login();
     await User.updateOne({ _id: t.user._id }, { $set: { lockUntil: new Date(Date.now() + 1e7) } });
     expect((await t.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'Other-pass-123' })).status).toBe(403);
-    expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'short' })).status).toBe(400);
+    expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: '' })).status).toBe(400);
     expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'Fresh-pass-123' })).status).toBe(200);
     expect((await api().post('/api/auth/login').send({ phone: t.phone, password: t.password })).status).toBe(401);
     expect((await api().post('/api/auth/login').send({ phone: t.phone, password: 'Fresh-pass-123' })).status).toBe(200);
@@ -154,6 +154,28 @@ describe('Админ удирдлага', () => {
     // Имэйлгүй хэрэглэгчийг админ болговол нэвтэрч чадахгүй тул хориглоно.
     const plain = await login();
     expect((await sup.agent.patch(`/api/admin/admins/${plain.user._id}/role`).send({ role: 'admin' })).status).toBe(400);
+  });
+
+  it('superadmin дээд тал нь 3 байна', async () => {
+    const first = await login('superadmin');
+    const add = (n: number) => first.agent.post('/api/admin/admins').send({ email: `s${n}@example.com`, phone: `9900110${n}`, password: 'pw', role: 'superadmin' });
+    expect((await add(1)).status).toBe(201);
+    expect((await add(2)).status).toBe(201);
+    const over = await add(3);
+    expect(over.status).toBe(409);
+    expect(over.body.error.code).toBe('SUPERADMIN_LIMIT');
+    expect(await User.countDocuments({ role: 'superadmin' })).toBe(3);
+
+    // Эрх солих замаар ч хязгаарыг давахгүй
+    const admin = await first.agent.post('/api/admin/admins').send({ email: 'a@example.com', phone: '99001109', password: 'pw', role: 'admin' });
+    expect(admin.status).toBe(201);
+    expect((await first.agent.patch(`/api/admin/admins/${admin.body.id}/role`).send({ role: 'superadmin' })).status).toBe(409);
+
+    // Аль хэдийн superadmin бол дахин зааж болно, нэгийг буулгавал сул орон гарна
+    expect((await first.agent.post('/api/admin/admins').send({ email: 's1@example.com', phone: '99001101', role: 'superadmin' })).status).toBe(201);
+    const second = await User.findOne({ email: 's1@example.com' }).lean();
+    expect((await first.agent.patch(`/api/admin/admins/${second!._id}/role`).send({ role: 'admin' })).status).toBe(200);
+    expect((await first.agent.patch(`/api/admin/admins/${admin.body.id}/role`).send({ role: 'superadmin' })).status).toBe(200);
   });
 
   it('буцаалтыг зөвхөн superadmin бүртгэж, холбогдох эрх цуцлагдана', async () => {

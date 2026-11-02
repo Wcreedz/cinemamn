@@ -28,14 +28,22 @@ describe('Нэвтрэлт', () => {
     expect((await api().post('/api/auth/login').send({ phone: '99112233', password: 'Strong-pass-1' })).status).toBe(200);
   });
 
-  it('бүртгэл: давхар дугаар, буруу дугаар, богино нууц үгийг татгалзана', async () => {
+  it('нэр заавал биш, нууц үг ямар ч урттай байж болно', async () => {
+    const res = await api().post('/api/auth/register').send({ phone: '99112277', password: '1' });
+    expect(res.status).toBe(201);
+    expect(res.body.user.name).toBe('');
+    expect((await api().post('/api/auth/login').send({ phone: '99112277', password: '1' })).status).toBe(200);
+  });
+
+  it('бүртгэл: давхар дугаар, буруу дугаар, хоосон нууц үгийг татгалзана', async () => {
     const body = { phone: '99112244', password: 'Strong-pass-1' };
     expect((await api().post('/api/auth/register').send(body)).status).toBe(201);
     const dup = await api().post('/api/auth/register').send(body);
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe('PHONE_TAKEN');
     expect((await api().post('/api/auth/register').send({ ...body, phone: '12345678' })).status).toBe(400);
-    expect((await api().post('/api/auth/register').send({ phone: '99112255', password: 'short' })).status).toBe(400);
+    expect((await api().post('/api/auth/register').send({ phone: '99112255', password: '' })).status).toBe(400);
+    expect((await api().post('/api/auth/register').send({ phone: '99112255' })).status).toBe(400);
   });
 
   it('бүртгэлээр эрх, төлөв өөрчилж чадахгүй', async () => {
@@ -122,7 +130,7 @@ describe('Нэвтрэлт', () => {
     await other.post('/api/auth/login').send({ phone, password });
 
     expect((await agent.post('/api/auth/change-password').send({ currentPassword: 'wrong', newPassword: 'New-password-123' })).status).toBe(400);
-    expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: 'short' })).status).toBe(400);
+    expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: '' })).status).toBe(400);
     expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: 'New-password-123' })).status).toBe(200);
 
     expect((await api().post('/api/auth/login').send({ phone, password })).status).toBe(401);

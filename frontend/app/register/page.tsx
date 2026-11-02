@@ -14,7 +14,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const { setUser } = useApp();
   const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,7 +21,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setBusy(true); setError(null);
     try {
-      const r = await api<{ user: PublicUser }>('/api/auth/register', { body: { phone, password, name } });
+      const r = await api<{ user: PublicUser }>('/api/auth/register', { body: { phone, password } });
       setUser(r.user);
       router.push('/subscription');
     } catch (err) {
@@ -34,8 +33,7 @@ export default function RegisterPage() {
     <AuthShell title="Бүртгүүлэх">
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-        <div><Label htmlFor="name">Нэр</Label><Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} /></div>
-        <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="new-password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Дор хаяж 8 тэмдэгт.</p></div>
+        <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
         {error && <Notice tone="danger">{error}</Notice>}
         <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Үүсгэж байна…' : 'Бүртгэл үүсгэх'}</Button>
       </form>
