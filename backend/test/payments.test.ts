@@ -13,7 +13,7 @@ const DAY = 86_400_000;
 const setup = seedMerchant;
 async function newPayment() {
   const user = await login();
-  const res = await user.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+  const res = await user.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
   expect(res.status).toBe(201);
   const doc = (await Payment.findById(res.body.id).lean())!;
   return { user, res, doc };
@@ -41,7 +41,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   it('фронтоос ирсэн дүн, төлөвт итгэхгүй', async () => {
     await setup();
     const user = await login();
-    const res = await user.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY', amount: 1, currency: 'USD', status: 'paid' });
+    const res = await user.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY', amount: 1, currency: 'USD', status: 'paid' });
     expect(res.body.amount).toBe(14900);
     expect(res.body.currency).toBe('MNT');
     expect(res.body.status).toBe('pending');
@@ -80,11 +80,11 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   it('нэг хэрэглэгчийн зэрэгцээ хоёр төлбөр хугацаагаа алдахгүй дараалж нэмэгдэнэ', async () => {
     await setup();
     const user = await login();
-    const a = await user.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+    const a = await user.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
     const adminUser = await login('admin');
     const { body } = await adminUser.agent.get('/api/admin/settings');
     await adminUser.agent.put('/api/admin/settings/subscription').send({ value: { ...body.subscription.value, plans: [{ code: 'MONTHLY', name: 'Сарын эрх', price: 19900, durationDays: 30, enabled: true }] } });
-    const b = await user.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+    const b = await user.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
     const docs = await Payment.find({ _id: { $in: [a.body.id, b.body.id] } }).lean();
     expect(docs).toHaveLength(2);
     docs.forEach((d) => qpay.markPaid(d.invoiceId!));
@@ -197,7 +197,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     env.UNDSEN_SERVER = undefined;
     try {
       const u = await login();
-      const res = await u.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+      const res = await u.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
       expect(res.status).toBe(503);
       expect(res.body.error.code).toBe('QPAY_NOT_CONFIGURED');
       expect(qpay.invoices.size).toBe(0);
@@ -217,7 +217,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
 
   it('баазад харилцагч байхгүй бол төлбөр failed болж шалтгаан нь админд харагдана', async () => {
     const u = await login();
-    const res = await u.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+    const res = await u.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
     expect(res.status).toBe(502);
     const p = (await Payment.findOne({ userId: u.user._id }).lean())!;
     expect(p.status).toBe('failed');
@@ -236,7 +236,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     await mongoose.connection.db.collection('token').deleteMany({});
     qpay.rejectAuth = true;
     const u = await login();
-    const res = await u.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+    const res = await u.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
     expect(res.status).toBe(502);
     expect((await Payment.findOne({ userId: u.user._id }).lean())!.failureReason).toBe('INVOICE_CREATE_FAILED');
   });

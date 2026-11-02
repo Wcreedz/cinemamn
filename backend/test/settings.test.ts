@@ -19,7 +19,7 @@ describe('Админ тохиргоо', () => {
 
     expect((await api().get('/api/subscriptions/plans')).body.plans[0].price).toBe(14900);
     const buyer = await login();
-    const oldInv = await buyer.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+    const oldInv = await buyer.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
     expect(oldInv.body.amount).toBe(14900);
     const oldDoc = (await Payment.findById(oldInv.body.id).lean())!;
 
@@ -33,7 +33,7 @@ describe('Админ тохиргоо', () => {
     // Нийтийн хуудас шинэ үнийг шууд авна
     expect((await api().get('/api/subscriptions/plans')).body.plans[0].price).toBe(19900);
     // Шинэ нэхэмжлэх
-    const newInv = await buyer.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+    const newInv = await buyer.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
     expect(newInv.body.amount).toBe(19900);
     expect(newInv.body.id).not.toBe(oldInv.body.id);
     expect(qpay.invoices.get((await Payment.findById(newInv.body.id).lean())!.invoiceId!)!.amount).toBe(19900);

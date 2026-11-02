@@ -27,7 +27,7 @@ function Content() {
     setBusy(planCode); setError(null);
     try {
       // Зөвхөн багцын код илгээнэ: дүнг сервер өөрөө тооцно.
-      const p = await api<PaymentView>('/api/payments/qpay/create', { body: { planCode } });
+      const p = await api<PaymentView>('/api/qpayGargaya', { body: { planCode } });
       router.push(`/subscription/pay/${p.id}`);
     } catch (e) {
       setError((e as Error).message);

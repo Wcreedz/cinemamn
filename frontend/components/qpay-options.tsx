@@ -1,60 +1,39 @@
-'use client';
-import { useState } from 'react';
 import type { PaymentView } from '@mongolflix/shared';
-import { Skeleton } from '@/components/ui/misc';
-import { useIsMobile } from '@/hooks/use-is-mobile';
+import { Building2, QrCode } from 'lucide-react';
+import { Card } from '@/components/ui/misc';
 
-type Qr = NonNullable<PaymentView['qr']>;
-
-function QrImage({ image }: { image: string }) {
-  return <img src={`data:image/png;base64,${image}`} alt="QPay QR код" className="mx-auto size-60 rounded-lg bg-white p-2" />;
-}
-
-function BankApps({ urls }: { urls: Qr['urls'] }) {
+// Жижиг дэлгэцэд банкны апп-ууд, том дэлгэцэд QR код.
+export function QPayOptions({ qr, amount }: { qr: NonNullable<PaymentView['qr']>; amount: string }) {
   return (
-    <ul className="grid grid-cols-4 gap-2" aria-label="Банкны апп">
-      {urls.map((u) => (
-        <li key={u.link}>
-          <a href={u.link} className="flex h-full flex-col items-center gap-1.5 rounded-xl border bg-muted p-2 text-center transition-colors hover:bg-accent">
-            {u.logo && <img src={u.logo} alt="" loading="lazy" className="size-10 rounded-xl" />}
-            <span className="line-clamp-2 text-[10px] leading-tight">{u.description || u.name}</span>
+    <>
+      <Card className="block p-4 sm:hidden">
+        <p className="mb-1 text-center text-lg font-bold">{amount}</p>
+        {qr.urls.map((item) => (
+          <a key={item.link} href={item.link} className="flex items-center justify-between gap-3 border-b p-2 last:border-b-0">
+            {item.logo ? <img src={item.logo} alt="" className="size-8 rounded-md" /> : <span className="size-8" />}
+            <span className="flex-1 text-center font-bold">{item.description || item.name}</span>
+            <span className="text-muted-foreground" aria-hidden>&gt;</span>
           </a>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// Гар утсан дээр банкны апп сонгоно, компьютер дээр утсаараа QR уншуулна.
-export function QPayOptions({ qr }: { qr: Qr }) {
-  const mobile = useIsMobile();
-  const [showQr, setShowQr] = useState(false);
-  const urls = qr.urls ?? [];
-
-  if (mobile === null) return <Skeleton className="mx-auto size-60" />;
-
-  if (mobile && urls.length > 0) {
-    return (
-      <div>
-        <p className="mb-3 text-sm font-semibold">Төлөх банкны апп-аа сонгоно уу</p>
-        <BankApps urls={urls} />
-        {qr.image && (
-          <div className="mt-4 text-center">
-            <button type="button" aria-expanded={showQr} onClick={() => setShowQr(!showQr)} className="cursor-pointer text-xs text-muted-foreground underline">
-              {showQr ? 'QR код нуух' : 'Өөр төхөөрөмжөөр уншуулах бол QR код харах'}
-            </button>
-            {showQr && <div className="mt-3"><QrImage image={qr.image} /></div>}
+        ))}
+      </Card>
+      <Card className="hidden p-8 sm:block">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Building2 className="size-8 text-primary" />
+            <h1 className="text-xl font-semibold">Төлөх дүн</h1>
           </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="text-center">
-      {qr.image && <QrImage image={qr.image} />}
-      <p className="mt-3 text-sm text-muted-foreground">Банкны апп-аараа QR кодыг уншуулж төлнө үү.</p>
-      {!qr.image && qr.shortUrl && <a href={qr.shortUrl} className="mt-2 inline-block text-sm text-primary underline">Төлбөрийн холбоос нээх</a>}
-    </div>
+          <QrCode className="size-8 text-muted-foreground" />
+        </div>
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-2xl font-semibold">{amount}</p>
+          <p className="text-center text-muted-foreground">Та доорх QR кодыг уншуулж төлбөрөө төлнө үү.</p>
+          {qr.image && (
+            <div className="rounded-md bg-muted p-4">
+              <img src={`data:image/png;base64,${qr.image}`} alt="QPay QR код" className="size-60 bg-white object-cover" />
+            </div>
+          )}
+        </div>
+      </Card>
+    </>
   );
 }

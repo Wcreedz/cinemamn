@@ -47,7 +47,7 @@ api.get('/subscriptions/me', requireAuth, subs.mine);
 api.get('/subscriptions/history', requireAuth, subs.history);
 
 // Төлбөр. Callback дээр нэвтрэлт байхгүй; зөвхөн QPay-с шууд шалгасан үр дүнд итгэнэ.
-api.post('/payments/qpay/create', requireAuth, payments.create);
+api.post('/qpayGargaya', requireAuth, payments.create);
 api.all('/qpaycallback/:baiguullagiinId/:zakhialgiinDugaar', payments.callback);
 api.get('/payments/history', requireAuth, payments.history);
 api.get('/payments/:id', requireAuth, payments.byId);

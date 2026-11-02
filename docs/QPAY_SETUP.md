@@ -13,7 +13,7 @@ QPAY_MERCHANT_SERVER=https://quickqr.qpay.mn/
 UNDSEN_SERVER=http://103.236.194.46/api
 ```
 
-Аль нэг нь дутуу бол `POST /payments/qpay/create` 503 буцаана. `QpayKhariltsagch`, `token` өөр баазад байвал `QPAY_MONGODB_URI`-г заана.
+Аль нэг нь дутуу бол `POST /qpayGargaya` 503 буцаана. `QpayKhariltsagch`, `token` өөр баазад байвал `QPAY_MONGODB_URI`-г заана.
 
 ## Merchant сонголт
 

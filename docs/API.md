@@ -8,7 +8,7 @@
 
 **Эрх**: `GET /api/subscriptions/plans`, `/me`, `/history`
 
-**Төлбөр**: `POST /api/payments/qpay/create { planCode }`, `GET|POST /api/qpaycallback/:baiguullagiinId/:zakhialgiinDugaar`, `GET /api/payments/:id`, `POST /api/payments/:id/check`, `GET /api/payments/history`. Хөгжүүлэлтэд л: `POST /api/payments/:id/dev-simulate`
+**Төлбөр**: `POST /api/qpayGargaya { planCode }`, `GET|POST /api/qpaycallback/:baiguullagiinId/:zakhialgiinDugaar`, `GET /api/payments/:id`, `POST /api/payments/:id/check`, `GET /api/payments/history`. Хөгжүүлэлтэд л: `POST /api/payments/:id/dev-simulate`
 
 **Тоглуулалт**: `POST /api/stream/:movieId/token`, `GET /api/stream/:movieId/manifest`, `GET /api/watch-history`, `PUT /api/watch-history/:movieId`
 

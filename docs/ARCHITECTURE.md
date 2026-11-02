@@ -29,7 +29,7 @@ worker (Node) ── FFmpeg ──▶ /srv/mongolflix/hls        MongoDB
 
 ## Төлбөрийн урсгал
 
-1. `POST /payments/qpay/create`: зөвхөн `planCode` уншина. Үнэ, хугацааг баазаас шууд авч, merchant-ийн лавлагааны хамт өөрчлөгдөшгүй хадгална.
+1. `POST /qpayGargaya`: зөвхөн `planCode` уншина. Үнэ, хугацааг баазаас шууд авч, merchant-ийн лавлагааны хамт өөрчлөгдөшгүй хадгална.
 2. `qpayGargaya` QR буцаана.
 3. QPay callback → `verifyFromCallback` → `qpayShalgay` тухайн нэхэмжлэхийн merchant-ийн лавлагаагаар шалгана.
 4. Нэхэмжлэхийн дугаар, PAID төлөв, дүн, валютыг тулгана.
