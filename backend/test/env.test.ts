@@ -20,6 +20,13 @@ describe('Орчны хувьсагч', () => {
     expect(() => parseEnv({ ...secrets, OTP_PEPPER: 'x', SETTINGS_ENCRYPTION_KEY: 'x' })).not.toThrow();
   });
 
+  it('production дээр видео хавтас заавал заагдана, хөгжүүлэлтэд анхны утгатай', () => {
+    expect(() => parseEnv({ ...secrets, NODE_ENV: 'production' })).toThrow(/VIDEO_DEFAULT_ROOT/);
+    expect(() => parseEnv({ ...secrets, NODE_ENV: 'production', VIDEO_DEFAULT_ROOT: '' })).toThrow(/VIDEO_DEFAULT_ROOT/);
+    expect(parseEnv({ ...secrets, NODE_ENV: 'production', VIDEO_DEFAULT_ROOT: '/srv/mongolflix' }).VIDEO_DEFAULT_ROOT).toBe('/srv/mongolflix');
+    expect(parseEnv({ ...secrets, NODE_ENV: 'development' }).VIDEO_DEFAULT_ROOT.length).toBeGreaterThan(0);
+  });
+
   it('буруу утгыг татгалзана', () => {
     expect(() => parseEnv({ ...secrets, COOKIE_SECURE: 'yes' })).toThrow(/COOKIE_SECURE/);
     expect(() => parseEnv({ ...secrets, JWT_ACCESS_SECRET: 'short' })).toThrow(/JWT_ACCESS_SECRET/);

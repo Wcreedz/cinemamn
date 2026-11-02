@@ -41,6 +41,10 @@ const schema = z.object({
 // талбарын шалгалтад унахгүй.
 export function parseEnv(raw: Record<string, string | undefined>) {
   const given = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined && v.trim() !== ''));
+  // Nginx видеог заасан хавтаснаас өгдөг тул production дээр төслийн хавтас руу чимээгүй бичихгүй.
+  if (given.NODE_ENV === 'production' && !given.VIDEO_DEFAULT_ROOT) {
+    throw new Error('Орчны хувьсагчийн тохиргоо буруу байна: production дээр VIDEO_DEFAULT_ROOT заавал бөглөнө (жишээ нь /srv/mongolflix).');
+  }
   const parsed = schema.safeParse(given);
   if (!parsed.success) {
     const lines = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
