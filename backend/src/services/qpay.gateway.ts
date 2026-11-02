@@ -41,13 +41,16 @@ export interface InvoiceResult {
 
 export interface CheckResult { status: string | undefined; amount: number | null; currency: string | undefined; invoiceId: string | undefined; paymentId: string | undefined; raw: Record<string, any> }
 
+// Нэхэмжлэх PAID үед QPay-н quickqr төлөлтийн мөр payment_status: 'SUCCESS' гэж буцаадаг.
+const PAID_ROW_STATUSES = new Set(['PAID', 'SUCCESS']);
+
 const toNumber = (v: unknown) => (v === undefined || v === null || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
 
 // payment/check-ийн хариунаас бодит төлөгдсөн дүнг гаргана. Төлөлтийн мөрүүд байвал тэдгээр нь
 // л эх сурвалж болно: нэхэмжлэхийн `amount` нь төлөвлөсөн дүн болохоос төлсөн дүн биш.
 export function parseCheckResponse(raw: Record<string, any>): CheckResult {
   const rows: any[] = Array.isArray(raw.payments) ? raw.payments : Array.isArray(raw.rows) ? raw.rows : [];
-  const paidRows = rows.filter((r) => String(r.payment_status ?? r.status ?? 'PAID').toUpperCase() === 'PAID');
+  const paidRows = rows.filter((r) => PAID_ROW_STATUSES.has(String(r.payment_status ?? r.status ?? 'PAID').toUpperCase()));
   const rowAmounts = paidRows.map((r) => toNumber(r.payment_amount ?? r.amount));
   const amount = rowAmounts.length && rowAmounts.every((a) => a !== null)
     ? (rowAmounts as number[]).reduce((s, a) => s + a, 0)
@@ -95,6 +98,14 @@ export const QPayGateway = {
         urls: Array.isArray(res.urls) ? res.urls : [],
       },
     };
+  },
+
+  // Сангийн QuickQpayObject бичлэгийг tureesBack-ийн адил төлсөн болгоно.
+  async markInvoicePaid(invoiceId: string, paymentId?: string) {
+    await pack().QuickQpayObject(kholbolt()).updateOne(
+      { invoice_id: invoiceId, tulsunEsekh: false },
+      { $set: { tulsunEsekh: true, ...(paymentId ? { payment_id: paymentId } : {}) } },
+    );
   },
 
   async checkInvoice(ref: MerchantRef, invoiceId: string): Promise<CheckResult> {

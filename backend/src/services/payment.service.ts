@@ -119,6 +119,10 @@ export const PaymentService = {
   async completeActivation(payment: IPayment) {
     const { sub, created } = await SubscriptionService.ensureForPayment(payment, payment.paidAt ?? new Date());
     await Payment.updateOne({ _id: payment._id }, { $set: { subscriptionId: sub._id } });
+    // Эрх аль хэдийн идэвхжсэн тул лавлах бичлэгийн алдаа төлбөрийн үр дүнд нөлөөлөхгүй.
+    if (payment.invoiceId) {
+      await QPayGateway.markInvoicePaid(payment.invoiceId, payment.paymentId).catch((err) => console.error('[payment] QuickQpayObject шинэчилж чадсангүй:', (err as Error).message));
+    }
     return created;
   },
 

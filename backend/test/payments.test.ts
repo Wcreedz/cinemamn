@@ -266,6 +266,43 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     expect((await callback(doc.orderNumber)).body.outcome).toBe('paid');
   });
 
+  it('quickqr.qpay.mn-ийн бодит хариу: SUCCESS мөр, "100.00" дүн таарвал төлсөнд тооцно', () => {
+    const real = {
+      id: '57630cb9-2193-46fe-9f1d-18cc8f9475bf', invoice_status: 'PAID', invoice_status_date: '2026-11-02T16:37:13.723Z',
+      payments: [{
+        id: '147127873368202', terminal_id: '95000059', amount: '100.00', currency: 'MNT', payment_name: 'Нэхэмжлэл',
+        paid_by: 'P2P', note: null, payment_status: 'SUCCESS', payment_status_date: '2026-11-02T16:37:13.719Z', transactions: [],
+      }],
+    };
+    const r = parseCheckResponse(real);
+    expect(r.status).toBe('PAID');
+    expect(r.amount).toBe(100);
+    expect(r.currency).toBe('MNT');
+    expect(r.paymentId).toBe('147127873368202');
+    expect(r.invoiceId).toBe(real.id);
+  });
+
+  it('амжилтгүй төлөлтийн мөрийг дүнд тооцохгүй', () => {
+    const r = parseCheckResponse({ invoice_status: 'OPEN', payments: [{ amount: '100.00', currency: 'MNT', payment_status: 'FAILED' }] });
+    expect(r.amount).toBeNull();
+    const partial = parseCheckResponse({ invoice_status: 'PAID', payments: [{ amount: '100.00', payment_status: 'SUCCESS' }, { amount: '50.00', payment_status: 'FAILED' }] });
+    expect(partial.amount).toBe(100);
+  });
+
+  it('төлөгдсөний дараа сангийн QuickQpayObject tulsunEsekh true болж, payment_id хадгалагдана', async () => {
+    await setup();
+    const { doc } = await newPayment();
+    const objects = () => mongoose.connection.db.collection('QuickQpayObject').findOne({ invoice_id: doc.invoiceId });
+    for (let i = 0; i < 20 && !(await objects()); i++) await new Promise((r) => setTimeout(r, 25));
+    expect((await objects())!.tulsunEsekh).toBe(false);
+    qpay.markPaid(doc.invoiceId!);
+    expect((await callback(doc.orderNumber)).body.outcome).toBe('paid');
+    const after = (await objects())!;
+    expect(after.tulsunEsekh).toBe(true);
+    expect(after.payment_id).toBe('pay-1');
+    expect((await Payment.findById(doc._id).lean())!.paymentId).toBe('pay-1');
+  });
+
   it('parseCheckResponse: нэхэмжлэхийн дүн биш, төлөлтийн мөрийг эх сурвалж болгоно', () => {
     expect(parseCheckResponse({ invoice_status: 'PAID', amount: 14900, payments: [{ payment_status: 'PAID', payment_amount: 100 }] }).amount).toBe(100);
     expect(parseCheckResponse({ invoice_status: 'PAID', paid_amount: '14900' }).amount).toBe(14900);

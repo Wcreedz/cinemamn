@@ -102,8 +102,8 @@ export class FakeQPay {
       if (this.checkOverride) return this.send(res, 200, this.checkOverride(inv));
       if (!inv) return this.send(res, 404, { error: 'INVOICE_NOTFOUND', message: 'INVOICE_NOTFOUND' });
       return this.send(res, 200, {
-        id: inv.id, invoice_status: inv.status, currency: inv.currency,
-        payments: inv.status === 'PAID' ? [{ id: 'pay-1', payment_status: 'PAID', amount: inv.paidAmount, currency: inv.currency }] : [],
+        id: inv.id, invoice_status: inv.status,
+        payments: inv.status === 'PAID' ? [{ id: 'pay-1', terminal_id: '95000059', amount: String(inv.paidAmount?.toFixed(2)), currency: inv.currency, payment_name: 'Нэхэмжлэл', paid_by: 'P2P', note: null, payment_status: 'SUCCESS', transactions: [] }] : [],
       });
     }
     this.send(res, 404, { message: 'unknown' });

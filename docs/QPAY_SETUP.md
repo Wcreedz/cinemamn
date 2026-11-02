@@ -10,7 +10,7 @@ QPay-н бүх дуудлага [quickqpaypackv2](../backend/src/services/qpay.g
 
 ```ini
 QPAY_MERCHANT_SERVER=https://quickqr.qpay.mn/
-UNDSEN_SERVER=http://103.236.194.46/api
+UNDSEN_SERVER=https://cinemamn-1g1l.vercel.app/api
 ```
 
 Аль нэг нь дутуу бол `POST /qpayGargaya` 503 буцаана. `QpayKhariltsagch`, `token` өөр баазад байвал `QPAY_MONGODB_URI`-г заана.
@@ -31,7 +31,7 @@ UNDSEN_SERVER=http://103.236.194.46/api
 
 Нэхэмжлэх бүр `qpayBaiguullagiinId`, `qpayBarilgiinId`-аа хадгалдаг тул кодын ID солигдсон ч хуучин нэхэмжлэх үүссэн merchant-аараа шалгагдана.
 
-`payment/check`-ийн хариуг `parseCheckResponse` уншина. Талбарын нэрс албан ёсны баримтад бүрэн тодорхойгүй тул тест сервер дээр шалгасан. Хариунд төлсөн дүн олдохгүй бол (`unverifiable`) эрхийг автоматаар идэвхжүүлэхгүй, админ "Төлбөрүүд" хэсгээс шалгана.
+`payment/check`-ийн хариуг `parseCheckResponse` уншина: `invoice_status: PAID`, `payments[].payment_status: SUCCESS`, `payments[].amount: "100.00"`, `payments[].currency` (quickqr.qpay.mn-ийн бодит хариугаар баталгаажсан). Хариунд төлсөн дүн олдохгүй бол (`unverifiable`) эрхийг автоматаар идэвхжүүлэхгүй, админ "Төлбөрүүд" хэсгээс шалгана.
 
 QPay-н баримт `payment/check`-ийг cron-оор дуудахыг хориглодог тул callback, хэрэглэгчийн товч (10 секундийн cooldown), админы товчоор л дуудна.
 

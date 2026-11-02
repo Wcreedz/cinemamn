@@ -61,7 +61,7 @@ SERVE_HLS_FROM_API=false
 VIDEO_DEFAULT_ROOT=/srv/mongolflix
 VIDEO_ALLOWED_ROOTS=/srv/mongolflix
 QPAY_MERCHANT_SERVER=https://quickqr.qpay.mn/
-UNDSEN_SERVER=http://103.236.194.46/api
+UNDSEN_SERVER=https://cinemamn-1g1l.vercel.app/api
 ```
 
 
