@@ -31,10 +31,10 @@ sudo chown -R "$USER":www-data /srv/mongolflix
 sudo chmod -R 750 /srv/mongolflix
 ```
 
-Портууд: вэб **3100**, API **4100** (зөвхөн 127.0.0.1). Гаднаас зөвхөн Nginx 80/443. Сервер дээр өөр сайт байгаа бол Nginx нь `server_name`-ээр салгана. Эхлэхээс өмнө шалгах:
+Портууд: вэб **3110**, API **4100** (зөвхөн 127.0.0.1). Гаднаас зөвхөн Nginx 80/443. Сервер дээр өөр сайт байгаа бол Nginx нь `server_name`-ээр салгана. Эхлэхээс өмнө шалгах:
 
 ```sh
-sudo ss -lntp | grep -E ':(3100|4100|27017)'
+sudo ss -lntp | grep -E ':(3110|4100|27017)'
 ```
 
 Апп нь серверийн үндсэн MongoDB (`localhost:27017`) дээрх тусдаа `mongolflix` бааз руу холбогдоно. Бусад баазад хүрэхгүй. MongoDB нэвтрэлттэй (`authorization: enabled`) бол тухайн баазад л эрхтэй хэрэглэгч үүсгэж `MONGODB_URI`-д оруулна: `mongodb://<хэрэглэгч>:<нууц үг>@localhost:27017/mongolflix?authSource=mongolflix`.

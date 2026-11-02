@@ -4,8 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ -f .env ] || { echo ".env алга байна. .env.example-г хуулж бөглөнө үү." >&2; exit 1; }
 mkdir -p logs
-# 3100/4100 өөр апп ашиглаж байвал давхцуулахгүйгээр зогсоно.
-for port in 3100 4100; do
+# 3110/4100 өөр апп ашиглаж байвал давхцуулахгүйгээр зогсоно.
+for port in 3110 4100; do
   owner="$(ss -lntpH "sport = :$port" 2>/dev/null || true)"
   if [ -n "$owner" ] && ! pm2 jlist 2>/dev/null | grep -q '"name":"mongolflix-'; then
     echo "$port порт завгүй байна:" >&2; echo "$owner" >&2; exit 1

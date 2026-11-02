@@ -46,7 +46,7 @@ module.exports = {
       name: 'mongolflix-web',
       cwd: frontend,
       script: path.join(__dirname, 'node_modules/next/dist/bin/next'),
-      args: 'start -p 3100 -H 127.0.0.1',
+      args: 'start -p 3110 -H 127.0.0.1',
       max_memory_restart: '1G',
       error_file: path.join(logs, 'web.err.log'),
       out_file: path.join(logs, 'web.out.log'),

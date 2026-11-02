@@ -12,7 +12,7 @@ Object.assign(process.env, {
   OTP_PEPPER: rnd(),
   INTERNAL_AUTH_SECRET: 'internal-secret-for-tests-only-0123456789',
   SETTINGS_ENCRYPTION_KEY: crypto.randomBytes(32).toString('base64'),
-  CORS_ORIGINS: 'http://localhost:3100',
+  CORS_ORIGINS: 'http://localhost:3110',
   QPAY_MERCHANT_SERVER: 'http://127.0.0.1:18931/',
   QPAY_SERVER_ENV: 'sandbox',
   QPAY_CHECK_RETRIES: '2',

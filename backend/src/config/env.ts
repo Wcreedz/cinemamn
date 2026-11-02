@@ -25,7 +25,7 @@ const schema = z.object({
   OTP_PEPPER: secret,
   INTERNAL_AUTH_SECRET: secret,
   SETTINGS_ENCRYPTION_KEY: base64Key,
-  CORS_ORIGINS: z.string().default('http://localhost:3100'),
+  CORS_ORIGINS: z.string().default('http://localhost:3110'),
   COOKIE_DOMAIN: z.string().optional(),
   COOKIE_SECURE: z.enum(['true', 'false']).optional(),
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
