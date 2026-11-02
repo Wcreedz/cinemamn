@@ -76,6 +76,8 @@ a.get('/movies/:id', admin.getMovie);
 a.put('/movies/:id', admin.updateMovie);
 a.delete('/movies/:id', admin.deleteMovie);
 a.post('/movies/:id/upload', admin.uploadVideo);
+a.post('/movies/:id/video/retry', admin.retryVideo);
+a.get('/video-tools', admin.videoTools);
 a.post('/movies/:id/image', admin.uploadImage);
 a.get('/video-jobs', admin.videoJobs);
 a.get('/categories', admin.listCategories);

@@ -5,7 +5,6 @@ import path from 'path';
 import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { env } from '../config/env';
 import { AdminLog, Category, IPayment, ISubscription, Movie, Payment, Subscription, User, VideoJob, WatchHistory } from '../models';
 import { logAdmin } from '../services/adminLog.service';
 import { AuthService, hashPassword } from '../services/auth.service';
@@ -159,9 +158,23 @@ export async function listMovies(req: Request, res: Response) {
 }
 
 export async function getMovie(req: Request, res: Response) {
-  const m = await Movie.findById(idParam(req)).populate('genres').lean();
+  const id = idParam(req);
+  const m = await Movie.findById(id).populate('genres').lean();
   if (!m) throw notFound('Кино олдсонгүй.');
-  res.json(adminMovie(m));
+  const videoRetryable = !!(await VideoJob.exists({ movieId: id, status: 'failed', retryable: true }));
+  res.json({ ...adminMovie(m), videoRetryable });
+}
+
+export async function videoTools(_req: Request, res: Response) {
+  await VideoService.checkTools();
+  res.json({ ok: true });
+}
+
+export async function retryVideo(req: Request, res: Response) {
+  const id = idParam(req);
+  const job = await VideoService.retry(String(id));
+  await logAdmin(req, 'movie.video_retry', { type: 'Movie', id }, { jobId: String(job._id) });
+  res.status(202).json({ videoStatus: 'queued' });
 }
 
 export async function createMovie(req: Request, res: Response) {
@@ -198,6 +211,7 @@ const VIDEO_EXTS = new Set(['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v']);
 export async function uploadVideo(req: Request, res: Response) {
   const id = idParam(req);
   if (!(await Movie.exists({ _id: id }))) throw notFound('Кино олдсонгүй.');
+  await VideoService.checkTools();
   const settings = await VideoConfigurationService.get({ fresh: true });
   const { temp } = VideoConfigurationService.dirs(settings.storageRoot);
   await fs.mkdir(temp, { recursive: true });
@@ -250,7 +264,8 @@ export async function uploadImage(req: Request, res: Response) {
   await fs.mkdir(dirs[folder], { recursive: true });
   const name = `${id}-${crypto.randomBytes(4).toString('hex')}${ext}`;
   await fs.writeFile(path.join(dirs[folder], name), req.file.buffer);
-  const url = `${env.PUBLIC_MEDIA_BASE_URL.replace(/\/$/, '')}/${folder}/${name}`;
+  // Харьцангуй зам: домэйн солигдох, HTTPS руу шилжихэд зураг эвдрэхгүй.
+  const url = `/media/${folder}/${name}`;
   await Movie.updateOne({ _id: id }, { $set: { [kind]: url } });
   await logAdmin(req, `movie.${kind}_upload`, { type: 'Movie', id });
   res.json({ url });

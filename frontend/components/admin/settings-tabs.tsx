@@ -120,8 +120,10 @@ const RES = [2160, 1440, 1080, 720, 480, 360];
 export function VideoTab({ entry, roots, reload }: { entry: Entry<Video>; roots: string[]; reload: () => Promise<void> }) {
   const { user } = useApp();
   const { form: f, setForm, save, msg, busy } = useSection(entry, 'video', reload);
+  const tools = useApi<{ ok: boolean }>('/api/admin/video-tools');
   return (
     <Panel className="max-w-3xl space-y-4">
+      {tools.error && <Notice tone="danger">{tools.error}</Notice>}
       <Field label="Видео хадгалах зам" hint="Серверийн VIDEO_ALLOWED_ROOTS-оос сонгоно. Зөвхөн Superadmin өөрчилнө. Өөрчилбөл Nginx-ийн замыг мөн шинэчилнэ.">
         <Select value={f.storageRoot} disabled={user?.role !== 'superadmin'} onChange={(e) => setForm({ ...f, storageRoot: e.target.value })}>
           {[...new Set([f.storageRoot, ...roots])].map((r) => <option key={r} value={r}>{r}</option>)}

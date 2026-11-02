@@ -80,7 +80,20 @@ describe('Админ удирдлага', () => {
     const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(16)]);
     const ok = await agent.post(`/api/admin/movies/${m._id}/image?kind=poster`).attach('image', png, { filename: 'b.png', contentType: 'image/png' });
     expect(ok.status).toBe(200);
-    expect(ok.body.url).toMatch(/\/posters\/.+\.png$/);
+    expect(ok.body.url).toMatch(/^\/media\/posters\/.+\.png$/);
+    // Бодит файл хадгалагдаж, тэр замаараа гарна
+    const served = await api().get(ok.body.url);
+    expect(served.status).toBe(200);
+    expect(served.headers['content-type']).toContain('image/png');
+    // Нийтийн API мөн ижил замыг өгнө
+    expect((await api().get(`/api/movies/${m.slug}`)).body.poster).toBe(ok.body.url);
+  });
+
+  it('өмнө бүтэн хаягаар хадгалсан постер одоогийн домэйнд хүчинтэй зам болно', async () => {
+    const m = await makeMovie({ poster: 'http://103.0.0.1/media/posters/a.png', backdrop: 'https://cdn.example.com/b.jpg' });
+    const { body } = await api().get(`/api/movies/${m.slug}`);
+    expect(body.poster).toBe('/media/posters/a.png');
+    expect(body.backdrop).toBe('https://cdn.example.com/b.jpg');
   });
 
   it('админ эрхийг гараар сунгаж, лог үлдээнэ', async () => {

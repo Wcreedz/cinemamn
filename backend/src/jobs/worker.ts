@@ -26,6 +26,7 @@ async function loop() {
 async function main() {
   await connectDb();
   console.info('[worker] ажиллаж эхэллээ');
+  await VideoService.checkTools().catch((err) => console.error(`[worker] ${err.message}`));
   await housekeeping();
   setInterval(() => housekeeping().catch((e) => console.error('[worker]', e)), HOUSEKEEPING_MS);
   await loop();

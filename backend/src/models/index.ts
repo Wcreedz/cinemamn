@@ -218,6 +218,8 @@ const videoJobSchema = new Schema({
   status: { type: String, enum: ['queued', 'processing', 'ready', 'failed'], default: 'queued' },
   error: String,
   attempts: { type: Number, default: 0 },
+  // Серверийн орчноос болж амжилтгүй болсон: эх файл хадгалагдсан, дахин оролдож болно.
+  retryable: { type: Boolean, default: false },
   lockedAt: Date,
   finishedAt: Date,
 }, opts('video_jobs'));

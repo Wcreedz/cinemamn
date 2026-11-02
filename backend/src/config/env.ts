@@ -25,7 +25,6 @@ const schema = z.object({
   COOKIE_SECURE: z.enum(['true', 'false']).optional(),
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   PUBLIC_VIDEO_BASE_URL: z.string().url().default('http://localhost:4100'),
-  PUBLIC_MEDIA_BASE_URL: z.string().url().default('http://localhost:4100/media'),
   SERVE_HLS_FROM_API: z.enum(['true', 'false']).default('false'),
   VIDEO_DEFAULT_ROOT: z.string().default(path.resolve(process.cwd(), '../video-server/storage')),
   // Админ хянах самбараас сонгож болох storage root-ууд. Энэ жагсаалтаас гадуур бичихгүй.

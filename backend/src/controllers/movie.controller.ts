@@ -7,8 +7,11 @@ import { z } from 'zod';
 
 const categoryView = (c: any) => ({ id: String(c._id), name: c.name, slug: c.slug, description: c.description, image: c.image, sortOrder: c.sortOrder, isActive: c.isActive });
 
+// Өмнө нь бүтэн хаягаар хадгалсан зургуудыг одоогийн домэйнд хүчинтэй зам болгоно.
+const mediaPath = (url?: string) => url?.replace(/^https?:\/\/[^/]+(\/media\/)/, '$1');
+
 export const movieSummary = (m: any) => ({
-  id: String(m._id), title: m.title, slug: m.slug, poster: m.poster, backdrop: m.backdrop, description: m.description,
+  id: String(m._id), title: m.title, slug: m.slug, poster: mediaPath(m.poster), backdrop: mediaPath(m.backdrop), description: m.description,
   releaseYear: m.releaseYear, duration: m.duration, featured: m.featured, viewCount: m.viewCount,
   genres: (m.genres ?? []).filter((g: any) => g?.name).map(categoryView),
 });

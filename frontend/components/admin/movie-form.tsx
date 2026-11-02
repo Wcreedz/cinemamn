@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AdminMovie, Category } from '@mongolflix/shared';
 import { Field, NumberInput, Panel } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,17 @@ import { Switch } from '@/components/ui/switch';
 import { useApi } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 
+const VIDEO_LABELS: Record<string, string> = { none: 'Видеогүй', uploading: 'Байршуулж байна', queued: 'Дараалалд', processing: 'Боловсруулж байна', ready: 'Бэлэн', failed: 'Алдаатай' };
+
 const blank = { title: '', slug: '', originalTitle: '', description: '', poster: '', backdrop: '', trailerUrl: '', releaseYear: NaN, duration: NaN, director: '', language: 'Монгол', country: '', cast: '', genres: [] as string[], isPublished: false, featured: false };
+
+// Зураг ачаалагдахгүй бол хоосон зай биш, шалтгааныг нь харуулна.
+function ImagePreview({ src, className }: { src: string; className: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [src]);
+  if (failed) return <Notice tone="danger" className="mb-2 break-all">Зураг ачаалагдсангүй: {src}</Notice>;
+  return <img src={src} alt="" onError={() => setFailed(true)} className={`mb-2 rounded-md object-cover ${className}`} />;
+}
 
 export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?: () => void }) {
   const router = useRouter();
@@ -62,8 +72,16 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   };
 
   // Том файлын явцыг харуулахын тулд fetch биш XHR ашиглана.
-  const uploadVideo = (file?: File) => {
+  const uploadVideo = async (file?: File) => {
     if (!file || !movie) return;
+    setMsg(null);
+    // Том файл дамжуулж дуусаад алдаа авахгүйн тулд серверийн бэлэн байдлыг эхлээд шалгана.
+    try {
+      await api('/api/admin/video-tools');
+    } catch (err) {
+      setMsg({ ok: false, text: (err as Error).message });
+      return;
+    }
     const form = new FormData();
     form.append('video', file);
     const xhr = new XMLHttpRequest();
@@ -81,6 +99,18 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     };
     setProgress(0);
     xhr.send(form);
+  };
+
+  const retryVideo = async () => {
+    if (!movie) return;
+    setMsg(null);
+    try {
+      await api(`/api/admin/movies/${movie.id}/video/retry`, { method: 'POST' });
+      setMsg({ ok: true, text: 'Дахин дараалалд орлоо.' });
+      onChanged?.();
+    } catch (err) {
+      setMsg({ ok: false, text: (err as Error).message });
+    }
   };
 
   const remove = async () => {
@@ -134,17 +164,18 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
         {movie ? (
           <Panel className="space-y-4">
             <Field label="Постер">
-              {f.poster && <img src={f.poster} alt="" className="mb-2 h-32 rounded-md object-cover" />}
+              {f.poster && <ImagePreview src={f.poster} className="h-32" />}
               <Input type="file" accept="image/jpeg,image/png,image/webp" className="pt-2" onChange={(e) => void uploadImage('poster', e.target.files?.[0])} />
             </Field>
             <Field label="Арын зураг">
-              {f.backdrop && <img src={f.backdrop} alt="" className="mb-2 h-24 rounded-md object-cover" />}
+              {f.backdrop && <ImagePreview src={f.backdrop} className="h-24" />}
               <Input type="file" accept="image/jpeg,image/png,image/webp" className="pt-2" onChange={(e) => void uploadImage('backdrop', e.target.files?.[0])} />
             </Field>
             <Field label="Эх видео" hint="FFmpeg тусдаа worker дээр HLS болгож боловсруулна.">
-              <p className="mb-2 text-sm">Төлөв: <Badge tone={movie.videoStatus === 'ready' ? 'success' : movie.videoStatus === 'failed' ? 'danger' : 'neutral'}>{movie.videoStatus}</Badge></p>
+              <p className="mb-2 text-sm">Төлөв: <Badge tone={movie.videoStatus === 'ready' ? 'success' : movie.videoStatus === 'failed' ? 'danger' : 'neutral'}>{VIDEO_LABELS[movie.videoStatus] ?? movie.videoStatus}</Badge></p>
               {movie.videoError && <Notice tone="danger" className="mb-2">{movie.videoError}</Notice>}
-              <Input type="file" accept="video/*,.mkv" className="pt-2" disabled={progress !== null} onChange={(e) => uploadVideo(e.target.files?.[0])} />
+              {movie.videoRetryable && <Button type="button" variant="outline" size="sm" className="mb-2 w-full" onClick={() => void retryVideo()}>Дахин боловсруулах</Button>}
+              <Input type="file" accept="video/*,.mkv" className="pt-2" disabled={progress !== null} onChange={(e) => void uploadVideo(e.target.files?.[0])} />
               {progress !== null && <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary" style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
             </Field>
           </Panel>

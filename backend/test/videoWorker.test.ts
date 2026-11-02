@@ -20,7 +20,80 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     sample = await fs.readFile(file);
   });
   afterAll(async () => { await fs.rm(env.VIDEO_DEFAULT_ROOT, { recursive: true, force: true }); await stopDb(); });
-  beforeEach(resetDb);
+  beforeEach(async () => {
+    await resetDb();
+    await fs.rm(path.join(env.VIDEO_DEFAULT_ROOT, 'temp'), { recursive: true, force: true });
+  });
+
+  it('FFmpeg алга үед файл хүлээж авахгүй, ойлгомжтой алдаа өгнө', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    const saved = env.FFPROBE_PATH;
+    env.FFPROBE_PATH = 'ffprobe-not-installed';
+    try {
+      expect((await admin.agent.get('/api/admin/video-tools')).status).toBe(503);
+      const res = await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
+      expect(res.status).toBe(503);
+      expect(res.body.error.code).toBe('FFMPEG_MISSING');
+      expect(res.body.error.message).toContain('apt install');
+      expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('none');
+      expect(await VideoJob.countDocuments()).toBe(0);
+    } finally {
+      env.FFPROBE_PATH = saved;
+    }
+    expect((await admin.agent.get('/api/admin/video-tools')).status).toBe(200);
+  });
+
+  it('worker дээр FFmpeg алга бол эх файл хадгалагдаж, суулгасны дараа дахин байршуулахгүй боловсруулна', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    const up = await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
+    expect(up.status).toBe(202);
+    const job = (await VideoService.claimNext())!;
+    const saved = env.FFPROBE_PATH;
+    env.FFPROBE_PATH = 'ffprobe-not-installed';
+    try {
+      await VideoService.process(job);
+    } finally {
+      env.FFPROBE_PATH = saved;
+    }
+    const failed = (await Movie.findById(movie._id).lean())!;
+    expect(failed.videoStatus).toBe('failed');
+    expect(failed.videoError).toContain('apt install');
+    expect(failed.videoError).not.toContain('ENOENT');
+    await fs.access(job.sourcePath);
+    expect((await admin.agent.get(`/api/admin/movies/${movie._id}`)).body.videoRetryable).toBe(true);
+
+    expect((await admin.agent.post(`/api/admin/movies/${movie._id}/video/retry`)).status).toBe(202);
+    expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('queued');
+    await VideoService.process((await VideoService.claimNext())!);
+    expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('ready');
+    expect((await admin.agent.get(`/api/admin/movies/${movie._id}`)).body.videoRetryable).toBe(false);
+    expect((await admin.agent.post(`/api/admin/movies/${movie._id}/video/retry`)).status).toBe(409);
+  });
+
+  it('шинэ файл байршуулахад хуучин амжилтгүй файл дискэнд үлдэхгүй', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
+    const job = (await VideoService.claimNext())!;
+    const saved = env.FFPROBE_PATH;
+    env.FFPROBE_PATH = 'ffprobe-not-installed';
+    await VideoService.process(job).finally(() => { env.FFPROBE_PATH = saved; });
+    await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino2.mp4', contentType: 'video/mp4' });
+    await expect(fs.access(job.sourcePath)).rejects.toThrow();
+  });
+
+  it('эвдэрсэн файл нь дахин оролдох боломжгүй, эх файл устана', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', Buffer.from('not a video'), { filename: 'bad.mp4', contentType: 'video/mp4' });
+    const job = (await VideoService.claimNext())!;
+    await VideoService.process(job);
+    await expect(fs.access(job.sourcePath)).rejects.toThrow();
+    expect((await admin.agent.get(`/api/admin/movies/${movie._id}`)).body.videoRetryable).toBe(false);
+    expect((await Movie.findById(movie._id).lean())!.videoError).toContain('боловсруулж чадсангүй');
+  });
 
   it('admin байршуулж, worker боловсруулж, эрхтэй хэрэглэгч манифест ба сегмент авна', async () => {
     const movie = await makeMovie({ videoStatus: 'none' });

@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ -f .env ] || { echo ".env алга байна. .env.example-г хуулж бөглөнө үү." >&2; exit 1; }
+command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null || { echo "FFmpeg алга байна: apt install -y ffmpeg" >&2; exit 1; }
 mkdir -p logs
 # 3110/4100 өөр апп ашиглаж байвал давхцуулахгүйгээр зогсоно.
 for port in 3110 4100; do

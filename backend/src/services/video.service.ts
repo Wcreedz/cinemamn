@@ -4,12 +4,26 @@ import path from 'path';
 import { promisify } from 'util';
 import { env } from '../config/env';
 import { Movie, VideoJob } from '../models';
+import { conflict, unavailable } from '../utils/errors';
 import { VideoSettings } from './settings.schemas';
 import { VideoConfigurationService } from './videoConfiguration.service';
 
 const run = promisify(execFile);
 const MAX_ATTEMPTS = 3;
 const STALE_LOCK_MS = 6 * 60 * 60 * 1000;
+const TOOLS_MISSING = 'FFmpeg сервер дээр олдсонгүй. "apt install -y ffmpeg" суулгаад дахин оролдоно уу.';
+const DISK_ERRORS = new Set(['ENOSPC', 'EACCES', 'EPERM', 'EROFS']);
+
+// Файлын буруу биш, серверийн орчны асуудал мөн эсэх. Ийм үед эх файлыг устгахгүй.
+function isEnvironmentError(err: NodeJS.ErrnoException) {
+  return /^spawn/.test(err.syscall ?? '') || DISK_ERRORS.has(String(err.code));
+}
+function failureMessage(err: NodeJS.ErrnoException) {
+  if (/^spawn/.test(err.syscall ?? '')) return TOOLS_MISSING;
+  if (err.code === 'ENOSPC') return 'Серверийн диск дүүрсэн байна. Зай чөлөөлөөд дахин оролдоно уу.';
+  if (DISK_ERRORS.has(String(err.code))) return 'Видео хадгалах хавтаст бичих эрх алга байна.';
+  return `Видео файлыг боловсруулж чадсангүй: ${err.message}`.slice(0, 1000);
+}
 
 // Өндөр -> зорилтот видео битрейт (kbps). Master playlist-ийн BANDWIDTH-д ашиглана.
 const BITRATES: Record<number, number> = { 2160: 14000, 1440: 8000, 1080: 5000, 720: 2800, 480: 1400, 360: 800 };
@@ -71,9 +85,34 @@ export async function verifyHls(dir: string) {
 }
 
 export const VideoService = {
+  // Том файл хүлээж авахаас өмнө дуудна.
+  async checkTools() {
+    try {
+      await run(env.FFMPEG_PATH, ['-version']);
+      await run(env.FFPROBE_PATH, ['-version']);
+    } catch {
+      throw unavailable('FFMPEG_MISSING', TOOLS_MISSING);
+    }
+  },
+
   async enqueue(movieId: string, sourcePath: string) {
+    // Шинэ файл ирвэл хуучин амжилтгүй оролдлогын эх файл дискэнд үлдэхгүй.
+    const stale = await VideoJob.find({ movieId, status: 'failed', retryable: true }).lean();
+    await Promise.all(stale.map((j) => fs.rm(j.sourcePath, { force: true })));
+    await VideoJob.updateMany({ movieId, status: 'failed', retryable: true }, { $set: { retryable: false } });
     await VideoJob.updateMany({ movieId, status: 'queued' }, { $set: { status: 'failed', error: 'Шинэ файлаар солигдсон' } });
     const job = await VideoJob.create({ movieId, sourcePath });
+    await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'queued' }, $unset: { videoError: 1 } });
+    return job;
+  },
+
+  // Серверийн асуудал засагдсаны дараа файлаа дахин байршуулахгүйгээр боловсруулна.
+  async retry(movieId: string) {
+    const job = await VideoJob.findOne({ movieId, status: 'failed', retryable: true }).sort({ createdAt: -1 });
+    if (!job) throw conflict('Дахин боловсруулах файл алга байна. Видеогоо дахин байршуулна уу.');
+    await fs.access(job.sourcePath).catch(() => { throw conflict('Эх файл олдсонгүй. Видеогоо дахин байршуулна уу.'); });
+    await VideoService.checkTools();
+    await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'queued', retryable: false }, $unset: { error: 1, finishedAt: 1 } });
     await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'queued' }, $unset: { videoError: 1 } });
     return job;
   },
@@ -115,12 +154,14 @@ export const VideoService = {
       });
       await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'ready', sourcePath: original, finishedAt: new Date() }, $unset: { error: 1 } });
     } catch (err) {
-      const message = (err as Error).message.slice(0, 1000);
-      console.error(`[video] боловсруулалт амжилтгүй ${movieId}:`, message);
+      const error = err as NodeJS.ErrnoException;
+      const retryable = isEnvironmentError(error);
+      const message = failureMessage(error);
+      console.error(`[video] боловсруулалт амжилтгүй ${movieId}:`, error.message.slice(0, 1000));
       await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);
-      await fs.rm(job.sourcePath, { force: true }).catch(() => undefined);
+      if (!retryable) await fs.rm(job.sourcePath, { force: true }).catch(() => undefined);
       await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'failed', videoError: message } });
-      await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'failed', error: message, finishedAt: new Date() } });
+      await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'failed', error: message, retryable, finishedAt: new Date() } });
     }
   },
 };

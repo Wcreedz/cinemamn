@@ -54,7 +54,6 @@ PORT=4100
 MONGODB_URI=mongodb://localhost:27017/mongolflix
 CORS_ORIGINS=https://zzzcinema.mn
 PUBLIC_VIDEO_BASE_URL=https://zzzcinema.mn
-PUBLIC_MEDIA_BASE_URL=https://zzzcinema.mn/media
 API_INTERNAL_URL=http://127.0.0.1:4100
 TRUST_PROXY=1
 SERVE_HLS_FROM_API=false
