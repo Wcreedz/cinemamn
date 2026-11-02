@@ -36,6 +36,33 @@ function Profile() {
     </Card>
   );
 }
+function ChangePassword() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api('/api/auth/change-password', { body: { currentPassword: current, newPassword: next } });
+      setCurrent(''); setNext('');
+      setMsg({ ok: true, text: 'Нууц үг солигдлоо. Бусад төхөөрөмж гарсан.' });
+    } catch (err) {
+      setMsg({ ok: false, text: (err as Error).message });
+    }
+  };
+  return (
+    <Card className="mt-5 max-w-md p-5">
+      <h2 className="mb-4 font-bold">Нууц үг солих</h2>
+      <form onSubmit={(e) => void save(e)} className="space-y-4">
+        <div><Label htmlFor="current">Одоогийн нууц үг</Label><Input id="current" type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
+        <div><Label htmlFor="next">Шинэ нууц үг</Label><Input id="next" type="password" autoComplete="new-password" minLength={8} required value={next} onChange={(e) => setNext(e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Дор хаяж 8 тэмдэгт.</p></div>
+        {msg && <Notice tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Notice>}
+        <Button type="submit">Солих</Button>
+      </form>
+    </Card>
+  );
+}
+
 export default function ProfilePage() {
-  return <><h1 className="mb-5 text-2xl font-black">Профайл</h1><AuthGate next="/profile"><Profile /></AuthGate></>;
+  return <><h1 className="mb-5 text-2xl font-black">Профайл</h1><AuthGate next="/profile"><Profile /><ChangePassword /></AuthGate></>;
 }

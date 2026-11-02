@@ -34,7 +34,7 @@ export const apiLimiter = rateLimit({ windowMs: 60_000, limit: env.RATE_LIMIT_MA
 export const authLimiter = rateLimit({ windowMs: 10 * 60_000, limit: env.AUTH_RATE_LIMIT_MAX, standardHeaders: true, legacyHeaders: false, message: { error: { code: 'RATE_LIMITED', message: 'Хэт олон оролдлого хийлээ. Түр хүлээнэ үү.' } } });
 
 // Энэ middleware /api дээр холбогдсон тул req.path-д /api угтвар байхгүй.
-const MAINTENANCE_EXEMPT = [/^\/health/, /^\/settings\/public/, /^\/auth\//, /^\/admin\//, /^\/payments\/qpay\/callback/];
+const MAINTENANCE_EXEMPT = [/^\/health/, /^\/settings\/public/, /^\/auth\//, /^\/admin\//, /^\/qpaycallback\//];
 export async function maintenanceGate(req: Request, _res: Response, next: NextFunction) {
   if (MAINTENANCE_EXEMPT.some((r) => r.test(req.path))) return next();
   const { maintenanceMode } = await SettingsService.get('general');

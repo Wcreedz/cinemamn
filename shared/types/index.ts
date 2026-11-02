@@ -10,8 +10,8 @@ export interface ApiError { error: { code: string; message: string; details?: un
 export interface Paginated<T> { items: T[]; total: number; page: number; limit: number; pages: number }
 
 export interface PublicUser {
-  id: string; phone: string; name: string; role: UserRole; status: UserStatus;
-  phoneVerified: boolean; createdAt: string; lastLoginAt?: string;
+  id: string; phone: string; email?: string; name: string; role: UserRole; status: UserStatus;
+  createdAt: string; lastLoginAt?: string;
 }
 
 export interface Category { id: string; name: string; slug: string; description?: string; image?: string; sortOrder: number; isActive: boolean }

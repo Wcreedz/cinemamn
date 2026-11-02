@@ -60,16 +60,16 @@ TRUST_PROXY=1
 SERVE_HLS_FROM_API=false
 VIDEO_DEFAULT_ROOT=/srv/mongolflix
 VIDEO_ALLOWED_ROOTS=/srv/mongolflix
-QPAY_MERCHANT_SERVER=https://merchant-sandbox.qpay.mn/
+QPAY_MERCHANT_SERVER=https://quickqr.qpay.mn/
+UNDSEN_SERVER=https://zzzcinema.mn/api
 ```
 
-Админ хэсгийн QPay Callback URL: `https://zzzcinema.mn/api/payments/qpay/callback`
 
 ```sh
 chmod 600 .env
 infrastructure/scripts/deploy.sh
 npm run seed:categories
-npm run admin:bootstrap -- +976XXXXXXXX "Нэр"
+npm run admin:bootstrap -- admin@zzzcinema.mn +976XXXXXXXX "Нэр"
 pm2 startup     # гарсан тушаалыг ажиллуулна: сервер асахад PM2 өөрөө асна
 ```
 
@@ -108,7 +108,7 @@ pm2 status && pm2 logs        # хяналт
 curl http://127.0.0.1:4100/api/health
 ```
 
-Сэргээх: `infrastructure/backup/restore.sh <файл>`. `SETTINGS_ENCRYPTION_KEY`-г нөөцөөс тусад нь хадгална. Видео файлуудыг (`/srv/mongolflix`) тусад нь rsync хийнэ.
+Сэргээх: `infrastructure/backup/restore.sh <файл>`. Видео файлуудыг (`/srv/mongolflix`) тусад нь rsync хийнэ.
 
 Шинэчлэх: `git pull && infrastructure/scripts/deploy.sh`
 

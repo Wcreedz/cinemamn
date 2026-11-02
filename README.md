@@ -10,11 +10,11 @@
 npm install
 cp .env.example .env     # нууц түлхүүрүүдээ бөглөнө
 npm run seed:categories
-npm run admin:bootstrap -- +97699112233 "Нэр"
+npm run admin:bootstrap -- admin@example.com +97699112233 "Нэр"
 npm run dev              # API :4100, вэб :3110, видео worker
 ```
 
-Сайт: http://localhost:3110, админ: http://localhost:3110/admin
+Сайт: http://localhost:3110, админ: http://localhost:3110/admin/login
 
 ## Шалгах
 

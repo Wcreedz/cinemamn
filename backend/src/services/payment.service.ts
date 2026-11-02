@@ -1,14 +1,13 @@
 import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { env } from '../config/env';
-import { IPayment, ISubscription, Payment, Subscription, User } from '../models';
+import { IPayment, Payment, Subscription } from '../models';
 import { AppError, conflict, notFound } from '../utils/errors';
 import { CheckResult, QPayGateway } from './qpay.gateway';
-import { QPayConfigurationService } from './qpayConfiguration.service';
 import { SubscriptionPricingService } from './subscriptionPricing.service';
 import { SubscriptionService } from './subscription.service';
-import { SmsConfigurationService } from './smsConfiguration.service';
 
+const QPAY_CURRENCY = 'MNT';
 const USER_CHECK_COOLDOWN_MS = 10_000;
 const REPAIR_WINDOW_MS = 30 * 86_400_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -30,16 +29,18 @@ function evaluate(p: IPayment, r: CheckResult): { outcome: 'paid' | 'pending' | 
 export const PaymentService = {
   async create(userId: Types.ObjectId, planCode: string) {
     const quote = await SubscriptionPricingService.quote(planCode);
-    const cfg = await QPayConfigurationService.requireEnabled();
-    if (quote.currency !== cfg.currency) {
-      throw new AppError(503, 'CURRENCY_UNSUPPORTED', `Эрхийн валют (${quote.currency}) QPay тохиргооны валюттай (${cfg.currency}) таарахгүй байна.`);
+    QPayGateway.assertConfigured();
+    const ref = QPayGateway.ref();
+    // quickqpaypackv2 нэхэмжлэхийг үргэлж MNT-ээр үүсгэдэг.
+    if (quote.currency !== QPAY_CURRENCY) {
+      throw new AppError(503, 'CURRENCY_UNSUPPORTED', `QPay зөвхөн ${QPAY_CURRENCY} дэмждэг. Эрхийн валют: ${quote.currency}.`);
     }
     const now = new Date();
 
     // Ижил нөхцөлтэй хүчинтэй нэхэмжлэх байвал шинээр үүсгэлгүй түүнийг буцаана.
     const existing = await Payment.findOne({
       userId, status: 'pending', planCode, amount: quote.amount, currency: quote.currency,
-      durationDays: quote.durationDays, qpayConfigurationId: cfg._id,
+      durationDays: quote.durationDays, qpayBaiguullagiinId: ref.baiguullagiinId, qpayBarilgiinId: ref.barilgiinId,
       invoiceId: { $type: 'string' }, expiresAt: { $gt: now },
     }).sort({ createdAt: -1 });
     if (existing) return existing;
@@ -47,17 +48,15 @@ export const PaymentService = {
     const payment = await Payment.create({
       userId, orderNumber: newOrderNumber(), amount: quote.amount, currency: quote.currency,
       planCode: quote.planCode, planName: quote.planName, durationDays: quote.durationDays, pricingVersion: quote.pricingVersion,
-      qpayConfigurationId: cfg._id, qpayConfigVersion: cfg.version, status: 'pending',
+      qpayBaiguullagiinId: ref.baiguullagiinId, qpayBarilgiinId: ref.barilgiinId, status: 'pending',
       expiresAt: new Date(now.getTime() + quote.expiryMinutes * 60_000),
     });
 
     try {
-      const separator = cfg.callbackUrl.includes('?') ? '&' : '?';
-      const invoice = await QPayGateway.createInvoice(cfg, {
+      const invoice = await QPayGateway.createInvoice(ref, {
         amount: payment.amount,
         orderNumber: payment.orderNumber,
         description: `MongolFlix ${payment.planName} ${payment.orderNumber}`,
-        callbackUrl: `${cfg.callbackUrl}${separator}order=${encodeURIComponent(payment.orderNumber)}`,
       });
       payment.invoiceId = invoice.invoiceId;
       payment.qr = invoice.qr;
@@ -84,8 +83,7 @@ export const PaymentService = {
     }
     if (payment.status === 'paid' || payment.status === 'refunded') return 'already_paid';
     if (!payment.invoiceId) return 'pending';
-    const cfg = await QPayConfigurationService.getById(payment.qpayConfigurationId);
-    const result = await QPayGateway.checkInvoice(cfg, payment.invoiceId);
+    const result = await QPayGateway.checkInvoice({ baiguullagiinId: payment.qpayBaiguullagiinId, barilgiinId: payment.qpayBarilgiinId }, payment.invoiceId);
     await Payment.updateOne({ _id: payment._id }, { $set: { lastCheckAt: new Date() } });
     const v = evaluate(payment, result);
 
@@ -100,9 +98,7 @@ export const PaymentService = {
       console.error(`[payment] төлбөр татгалзав ${payment.orderNumber}: ${v.reason} ${v.note ?? ''}`);
       return 'rejected';
     }
-    const applied = await this.applyPaid(payment._id, result.paymentId);
-    if (applied) await this.notifyPaid(payment._id);
-    return applied ? 'paid' : 'already_paid';
+    return (await this.applyPaid(payment._id, result.paymentId)) ? 'paid' : 'already_paid';
   },
 
   // Нөхцөлт шинэчлэлт нь давхар callback болон зэрэгцээ хүсэлтээс зөвхөн нэгийг нь нэвтрүүлнэ.
@@ -131,7 +127,7 @@ export const PaymentService = {
     const since = new Date(now.getTime() - REPAIR_WINDOW_MS);
     const incomplete = await Payment.find({ status: 'paid', subscriptionId: { $exists: false }, paidAt: { $gte: since } }).limit(100).lean<IPayment[]>();
     for (const p of incomplete) {
-      if (await this.completeActivation(p)) await this.notifyPaid(p._id);
+      await this.completeActivation(p);
     }
     const refunded = await Payment.find({ status: 'refunded', updatedAt: { $gte: since } }).select('_id').lean();
     const cancelled = await Subscription.updateMany({ paymentId: { $in: refunded.map((p) => p._id) }, status: 'active' }, { $set: { status: 'cancelled' } });
@@ -158,20 +154,6 @@ export const PaymentService = {
       await this.verify(payment._id);
     }
     return (await Payment.findById(id).lean<IPayment>())!;
-  },
-
-  async notifyPaid(id: Types.ObjectId) {
-    try {
-      const p = await Payment.findById(id).lean<IPayment>();
-      if (!p) return;
-      const [user, sub] = await Promise.all([User.findById(p.userId).lean(), Subscription.findById(p.subscriptionId).lean<ISubscription>()]);
-      if (!user || !sub) return;
-      const provider = await SmsConfigurationService.getProvider();
-      await provider.send(user.phone, `MongolFlix: ${p.planName} идэвхжлээ. Дуусах огноо: ${sub.expiresAt.toISOString().slice(0, 10)}.`);
-    } catch (err) {
-      // Эрх аль хэдийн идэвхжсэн тул мэдэгдлийн алдаа төлбөрийн үр дүнд нөлөөлөхгүй.
-      console.error('[payment] мэдэгдэл илгээж чадсангүй:', (err as Error).message);
-    }
   },
 
   async expirePending(now = new Date()) {

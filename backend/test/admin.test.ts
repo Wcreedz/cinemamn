@@ -15,7 +15,7 @@ describe('Админ удирдлага', () => {
   const adminPaths: [string, string][] = [
     ['get', '/api/admin/dashboard'], ['get', '/api/admin/users'], ['get', '/api/admin/movies'], ['post', '/api/admin/movies'],
     ['get', '/api/admin/payments'], ['get', '/api/admin/logs'], ['get', '/api/admin/settings'], ['put', '/api/admin/settings/subscription'],
-    ['get', '/api/admin/settings/qpay'], ['post', '/api/admin/settings/qpay'], ['get', '/api/admin/settings/sms'], ['post', '/api/admin/settings/sms/test'],
+    ['patch', '/api/admin/users/000000000000000000000000/password'],
   ];
 
   it('нэвтрээгүй болон энгийн хэрэглэгч бүх /admin API-д хаагдана', async () => {
@@ -106,19 +106,46 @@ describe('Админ удирдлага', () => {
     expect((await admin.agent.patch(`/api/admin/users/${other.user._id}/status`).send({ status: 'blocked' })).status).toBe(403);
   });
 
+  it('админ мартсан нууц үгийг шинэчилж, сешн хаагдаж, түгжээ арилна', async () => {
+    const admin = await login('admin');
+    const t = await login();
+    await User.updateOne({ _id: t.user._id }, { $set: { lockUntil: new Date(Date.now() + 1e7) } });
+    expect((await t.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'Other-pass-123' })).status).toBe(403);
+    expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'short' })).status).toBe(400);
+    expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'Fresh-pass-123' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone: t.phone, password: t.password })).status).toBe(401);
+    expect((await api().post('/api/auth/login').send({ phone: t.phone, password: 'Fresh-pass-123' })).status).toBe(200);
+    expect((await t.agent.post('/api/auth/refresh')).status).toBe(401);
+    expect(await AdminLog.countDocuments({ action: 'user.password_reset' })).toBe(1);
+    // Логт нууц үг бичигдэхгүй
+    expect(JSON.stringify(await AdminLog.find().lean())).not.toContain('Fresh-pass-123');
+  });
+
+  it('админы нууц үгийг зөвхөн superadmin шинэчилнэ', async () => {
+    const admin = await login('admin');
+    const other = await login('admin');
+    expect((await admin.agent.patch(`/api/admin/users/${other.user._id}/password`).send({ password: 'Fresh-pass-123' })).status).toBe(403);
+    const sup = await login('superadmin');
+    expect((await sup.agent.patch(`/api/admin/users/${other.user._id}/password`).send({ password: 'Fresh-pass-123' })).status).toBe(200);
+  });
+
   it('админ удирдлага зөвхөн superadmin-д; сүүлчийн superadmin-г хасахгүй', async () => {
     const admin = await login('admin');
-    expect((await admin.agent.post('/api/admin/admins').send({ phone: '99001122', password: 'Admin-pass-1234', role: 'admin' })).status).toBe(403);
+    expect((await admin.agent.post('/api/admin/admins').send({ email: 'new@example.com', phone: '99001122', password: 'Admin-pass-1234', role: 'admin' })).status).toBe(403);
     const sup = await login('superadmin');
-    const created = await sup.agent.post('/api/admin/admins').send({ phone: '99001122', password: 'Admin-pass-1234', role: 'admin' });
+    const created = await sup.agent.post('/api/admin/admins').send({ email: 'new@example.com', phone: '99001122', password: 'Admin-pass-1234', role: 'admin' });
     expect(created.status).toBe(201);
     expect((await User.findById(created.body.id).lean())!.role).toBe('admin');
     expect((await sup.agent.patch(`/api/admin/admins/${sup.user._id}/role`).send({ role: 'user' })).status).toBe(409);
+    expect((await api().post('/api/auth/admin/login').send({ email: 'new@example.com', password: 'Admin-pass-1234' })).status).toBe(200);
+    // Имэйлгүй хэрэглэгчийг админ болговол нэвтэрч чадахгүй тул хориглоно.
+    const plain = await login();
+    expect((await sup.agent.patch(`/api/admin/admins/${plain.user._id}/role`).send({ role: 'admin' })).status).toBe(400);
   });
 
   it('буцаалтыг зөвхөн superadmin бүртгэж, холбогдох эрх цуцлагдана', async () => {
     const { user } = await login();
-    const p = await Payment.create({ userId: user._id, orderNumber: 'MFTESTORDER01', amount: 14900, currency: 'MNT', planCode: 'MONTHLY', planName: 'С', durationDays: 30, pricingVersion: 1, qpayConfigurationId: user._id, qpayConfigVersion: 1, status: 'paid' });
+    const p = await Payment.create({ userId: user._id, orderNumber: 'MFTESTORDER01', amount: 14900, currency: 'MNT', planCode: 'MONTHLY', planName: 'С', durationDays: 30, pricingVersion: 1, qpayBaiguullagiinId: 'org-1', qpayBarilgiinId: 'branch-1', status: 'paid' });
     const sub = await Subscription.create({ seq: 1, userId: user._id, planCode: 'MONTHLY', amount: 14900, currency: 'MNT', status: 'active', startedAt: new Date(), expiresAt: new Date(Date.now() + 1e9), paymentId: p._id });
     await Payment.updateOne({ _id: p._id }, { $set: { subscriptionId: sub._id } });
     const admin = await login('admin');

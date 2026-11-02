@@ -1,21 +1,16 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
-import { Payment, QPayConfiguration, Subscription } from '../src/models';
-import { parseCheckResponse } from '../src/services/qpay.gateway';
+import { env } from '../src/config/env';
+import { Payment, Subscription } from '../src/models';
+import { BAIGUULLAGIIN_ID, BARILGIIN_ID, parseCheckResponse } from '../src/services/qpay.gateway';
 import { PaymentService } from '../src/services/payment.service';
 import { SubscriptionService } from '../src/services/subscription.service';
-import { api, FakeQPay, login, qpayInput, resetDb, seedMerchant, startDb, stopDb } from './helpers';
+import { api, FakeQPay, login, resetDb, seedMerchant, startDb, stopDb } from './helpers';
 
 const qpay = new FakeQPay();
 const DAY = 86_400_000;
 
-async function setup() {
-  await seedMerchant();
-  const admin = await login('superadmin');
-  const saved = await admin.agent.post('/api/admin/settings/qpay').send(qpayInput());
-  if (saved.status !== 201) throw new Error(JSON.stringify(saved.body));
-  return admin;
-}
+const setup = seedMerchant;
 async function newPayment() {
   const user = await login();
   const res = await user.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
@@ -23,7 +18,7 @@ async function newPayment() {
   const doc = (await Payment.findById(res.body.id).lean())!;
   return { user, res, doc };
 }
-const callback = (order: string) => api().get(`/api/payments/qpay/callback?order=${order}`);
+const callback = (order: string) => api().get(`/api/qpaycallback/${BAIGUULLAGIIN_ID}/${order}`);
 
 describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   beforeAll(async () => { await startDb(); await qpay.start(); });
@@ -39,7 +34,8 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     const inv = qpay.invoices.get(doc.invoiceId!)!;
     expect(inv.amount).toBe(14900);
     expect(inv.merchantId).toBe('merchant-false');
-    expect(inv.callback).toContain(`order=${doc.orderNumber}`);
+    expect(inv.callback).toBe(`http://localhost:4100/api/qpaycallback/${BAIGUULLAGIIN_ID}/${doc.orderNumber}`);
+    expect(doc.qpayBarilgiinId).toBe(BARILGIIN_ID);
   });
 
   it('фронтоос ирсэн дүн, төлөвт итгэхгүй', async () => {
@@ -195,15 +191,44 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     expect((await Subscription.findOne({ userId: user.user._id }).lean())!.status).toBe('expired');
   });
 
-  it('QPay идэвхгүй бол нэхэмжлэх үүсгэхгүй', async () => {
-    await seedMerchant();
-    const admin = await login('superadmin');
-    await admin.agent.post('/api/admin/settings/qpay').send(qpayInput({ enabled: false }));
+  it('QPay тохиргоо дутуу бол нэхэмжлэх үүсгэхгүй, төлбөрийн бичлэг ч үлдэхгүй', async () => {
+    await setup();
+    const saved = env.UNDSEN_SERVER;
+    env.UNDSEN_SERVER = undefined;
+    try {
+      const u = await login();
+      const res = await u.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
+      expect(res.status).toBe(503);
+      expect(res.body.error.code).toBe('QPAY_NOT_CONFIGURED');
+      expect(qpay.invoices.size).toBe(0);
+      expect(await Payment.countDocuments()).toBe(0);
+    } finally {
+      env.UNDSEN_SERVER = saved;
+    }
+  });
+
+  it('өөр байгууллагын хаягаар ирсэн callback төлбөр хөндөхгүй', async () => {
+    await setup();
+    const { doc } = await newPayment();
+    qpay.markPaid(doc.invoiceId!);
+    expect((await api().get(`/api/qpaycallback/other-org/${doc.orderNumber}`)).status).toBe(404);
+    expect(await Subscription.countDocuments()).toBe(0);
+  });
+
+  it('баазад харилцагч байхгүй бол төлбөр failed болж шалтгаан нь админд харагдана', async () => {
     const u = await login();
     const res = await u.agent.post('/api/payments/qpay/create').send({ planCode: 'MONTHLY' });
-    expect(res.status).toBe(503);
-    expect(res.body.error.code).toBe('QPAY_DISABLED');
-    expect(qpay.invoices.size).toBe(0);
+    expect(res.status).toBe(502);
+    const p = (await Payment.findOne({ userId: u.user._id }).lean())!;
+    expect(p.status).toBe('failed');
+    expect(p.verificationNote).toContain('олдсонгүй');
+  });
+
+  it('бүртгэлтэй merchant-ийг шинээр бүртгэхгүй, merchant_idFalse-аар нэхэмжлэх үүсгэнэ', async () => {
+    await setup();
+    const { doc } = await newPayment();
+    expect(qpay.invoices.get(doc.invoiceId!)!.merchantId).toBe('merchant-false');
+    expect(qpay.merchantRequests).toBe(0);
   });
 
   it('QPay алдаа буцаавал төлбөр failed болж эрх үүсэхгүй', async () => {
@@ -226,10 +251,10 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   it('нэхэмжлэхийн дүн өөрчлөгдөхгүй (immutable)', async () => {
     await setup();
     const { doc } = await newPayment();
-    await Payment.updateOne({ _id: doc._id }, { $set: { amount: 1, qpayConfigVersion: 99 } });
+    await Payment.updateOne({ _id: doc._id }, { $set: { amount: 1, qpayBaiguullagiinId: 'other' } });
     const after = (await Payment.findById(doc._id).lean())!;
     expect(after.amount).toBe(14900);
-    expect(after.qpayConfigVersion).toBe(doc.qpayConfigVersion);
+    expect(after.qpayBaiguullagiinId).toBe(BAIGUULLAGIIN_ID);
   });
 
   it('хугацаа дууссан нэхэмжлэхийг төлсөн бол бодит төлбөрийг хүлээн авна', async () => {
@@ -247,17 +272,20 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     expect(parseCheckResponse({ invoice_status: 'PAID' }).amount).toBeNull();
   });
 
-  it('хуучин хувилбарын нэхэмжлэх тохиргоо солигдсон ч тухайн хувилбараараа шалгагдана', async () => {
-    const admin = await setup();
+  it('салбарын ID кодод солигдсон ч хуучин нэхэмжлэх үүссэн салбараараа шалгагдана', async () => {
+    await setup();
     const { doc } = await newPayment();
-    await admin.agent.post('/api/admin/settings/qpay').send(qpayInput({ merchantName: 'Шинэ нэр' }));
-    await admin.agent.post('/api/admin/settings/qpay').send(qpayInput({ merchantName: 'Гурав дахь', enabled: false }));
-    expect(await QPayConfiguration.countDocuments()).toBe(3);
+    await mongoose.connection.db.collection('payments').updateOne({ _id: doc._id }, { $set: { qpayBarilgiinId: 'previous-branch' } });
     qpay.markPaid(doc.invoiceId!);
     expect((await callback(doc.orderNumber)).body.outcome).toBe('paid');
-    expect((await Payment.findById(doc._id).lean())!.qpayConfigVersion).toBe(1);
-    const versionDoc = await QPayConfiguration.findOne({ version: 1 }).lean();
-    const del = await admin.agent.delete(`/api/admin/settings/qpay/versions/${versionDoc!._id}`);
-    expect(del.status).toBe(409);
+  });
+
+  it('устсан салбарын нэхэмжлэхийг шалгаж чадахгүй бол эрх үүсгэхгүй', async () => {
+    await setup();
+    const { doc } = await newPayment();
+    await mongoose.connection.db.collection('payments').updateOne({ _id: doc._id }, { $set: { qpayBarilgiinId: 'missing-branch' } });
+    qpay.markPaid(doc.invoiceId!);
+    expect((await callback(doc.orderNumber)).status).toBe(502);
+    expect(await Subscription.countDocuments()).toBe(0);
   });
 });

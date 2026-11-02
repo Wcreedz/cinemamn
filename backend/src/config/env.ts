@@ -2,9 +2,6 @@ import path from 'path';
 import { z } from 'zod';
 
 const REQUIRED = 'заавал бөглөнө';
-const base64Key = z.string({ error: `${REQUIRED} (openssl rand -base64 32)` }).refine((v) => Buffer.from(v, 'base64').length === 32, {
-  message: 'base64-ээр кодолсон яг 32 байт түлхүүр байх ёстой (openssl rand -base64 32)',
-});
 const secret = z.string({ error: `${REQUIRED} (openssl rand -hex 32)` }).min(32, 'хамгийн багадаа 32 тэмдэгт байх ёстой');
 const csv = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -16,15 +13,13 @@ const schema = z.object({
   QPAY_MONGODB_URI: z.string().optional(),
   // quickqpaypackv2 энэ хувьсагчаас QPay серверийн хаягийг уншдаг.
   QPAY_MERCHANT_SERVER: z.string().url().optional(),
-  // merchant.qpay.mn / merchant-sandbox.qpay.mn-ээс өөр хаяг (жишээ нь тест сервер) дээр заавал зааж өгнө.
-  QPAY_SERVER_ENV: z.enum(['sandbox', 'production']).optional(),
+  // API-н гаднаас хандах хаяг (жишээ нь https://zzzcinema.mn/api). QPay callback эндээс бүтнэ.
+  UNDSEN_SERVER: z.string().url().optional(),
   QPAY_CHECK_RETRIES: z.coerce.number().int().min(1).default(3),
   QPAY_CHECK_RETRY_DELAY_MS: z.coerce.number().int().min(0).default(3000),
   JWT_ACCESS_SECRET: secret,
   PLAYBACK_TOKEN_SECRET: secret,
-  OTP_PEPPER: secret,
   INTERNAL_AUTH_SECRET: secret,
-  SETTINGS_ENCRYPTION_KEY: base64Key,
   CORS_ORIGINS: z.string().default('http://localhost:3110'),
   COOKIE_DOMAIN: z.string().optional(),
   COOKIE_SECURE: z.enum(['true', 'false']).optional(),

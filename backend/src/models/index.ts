@@ -7,37 +7,25 @@ const ref = (name: string) => ({ type: Schema.Types.ObjectId, ref: name });
 
 // ---------- User ----------
 export interface IUser {
-  _id: Types.ObjectId; phone: string; passwordHash: string; name: string;
-  role: 'user' | 'admin' | 'superadmin'; status: 'active' | 'blocked'; phoneVerified: boolean;
+  _id: Types.ObjectId; phone: string; email?: string; passwordHash: string; name: string;
+  role: 'user' | 'admin' | 'superadmin'; status: 'active' | 'blocked';
   failedLoginAttempts: number; lockUntil?: Date; lastLoginAt?: Date; createdAt: Date; updatedAt: Date;
 }
 const userSchema = new Schema<IUser>({
   phone: { type: String, required: true, unique: true, match: /^\+976[6-9]\d{7}$/ },
+  // Админ эрхтэй хүн имэйлээр нэвтэрнэ. Энгийн хэрэглэгчид хэрэггүй.
+  email: { type: String, lowercase: true, trim: true, maxlength: 254, match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
   passwordHash: { type: String, required: true, select: false },
   name: { type: String, default: '', trim: true, maxlength: 80 },
   role: { type: String, enum: ['user', 'admin', 'superadmin'], default: 'user' },
   status: { type: String, enum: ['active', 'blocked'], default: 'active' },
-  phoneVerified: { type: Boolean, default: false },
   failedLoginAttempts: { type: Number, default: 0 },
   lockUntil: Date,
   lastLoginAt: Date,
 }, opts('users'));
+userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
 userSchema.index({ role: 1, status: 1 });
 export const User = model<IUser>('User', userSchema);
-
-// ---------- OTP ----------
-const otpSchema = new Schema({
-  phone: { type: String, required: true },
-  otpHash: { type: String, required: true },
-  purpose: { type: String, required: true, enum: ['register', 'reset'] },
-  expiresAt: { type: Date, required: true },
-  attempts: { type: Number, default: 0 },
-  maxAttempts: { type: Number, required: true },
-  verifiedAt: Date,
-}, opts('otps'));
-otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 3600 }); // хугацаа дууссанаас 1 цагийн дараа устана
-otpSchema.index({ phone: 1, purpose: 1, createdAt: -1 });
-export const Otp = model('Otp', otpSchema);
 
 // ---------- RefreshSession (зөвхөн hash хадгална) ----------
 const refreshSchema = new Schema({
@@ -45,6 +33,8 @@ const refreshSchema = new Schema({
   familyId: { type: String, required: true },
   tokenHash: { type: String, required: true, unique: true },
   expiresAt: { type: Date, required: true },
+  // false: "Намайг сануул" сонгоогүй, cookie хөтөч хаагдахад устана.
+  persistent: { type: Boolean, default: true },
   revokedAt: Date,
   replacedAt: Date,
   userAgent: String,
@@ -130,7 +120,7 @@ export const Subscription = model<ISubscription>('Subscription', subscriptionSch
 export interface IPayment {
   _id: Types.ObjectId; userId: Types.ObjectId; orderNumber: string; invoiceId?: string; paymentId?: string;
   provider: 'qpay'; amount: number; currency: string; planCode: string; planName: string; durationDays: number;
-  pricingVersion: number; qpayConfigurationId: Types.ObjectId; qpayConfigVersion: number;
+  pricingVersion: number; qpayBaiguullagiinId: string; qpayBarilgiinId: string;
   status: 'pending' | 'paid' | 'failed' | 'expired' | 'refunded'; failureReason?: string;
   subscriptionId?: Types.ObjectId; paidAt?: Date; verifiedAt?: Date; expiresAt?: Date; lastCheckAt?: Date;
   verificationNote?: string; refundedBy?: Types.ObjectId; refundNote?: string;
@@ -150,8 +140,9 @@ const paymentSchema = new Schema<IPayment>({
   planName: { type: String, required: true, immutable: true },
   durationDays: { type: Number, required: true, min: 1, immutable: true },
   pricingVersion: { type: Number, required: true, immutable: true },
-  qpayConfigurationId: { ...ref('QPayConfiguration'), required: true, immutable: true },
-  qpayConfigVersion: { type: Number, required: true, immutable: true },
+  // Код дахь ID солигдсон ч хүлээгдэж буй нэхэмжлэх үүссэн merchant-аараа шалгагдана.
+  qpayBaiguullagiinId: { type: String, required: true, immutable: true },
+  qpayBarilgiinId: { type: String, required: true, immutable: true },
   status: { type: String, enum: ['pending', 'paid', 'failed', 'expired', 'refunded'], default: 'pending' },
   failureReason: String,
   subscriptionId: ref('Subscription'),
@@ -171,7 +162,6 @@ paymentSchema.index({ invoiceId: 1 }, { unique: true, partialFilterExpression: {
 paymentSchema.index({ paymentId: 1 }, { partialFilterExpression: { paymentId: { $type: 'string' } } });
 paymentSchema.index({ userId: 1, createdAt: -1 });
 paymentSchema.index({ status: 1, createdAt: -1 });
-paymentSchema.index({ qpayConfigurationId: 1, status: 1 });
 export const Payment = model<IPayment>('Payment', paymentSchema);
 
 // ---------- WatchHistory ----------
@@ -220,60 +210,6 @@ const systemSettingSchema = new Schema({
   updatedBy: ref('User'),
 }, opts('system_settings'));
 export const SystemSetting = model('SystemSetting', systemSettingSchema);
-
-// ---------- QPayConfiguration (хувилбартай) ----------
-// Нэвтрэх мэдээлэл quickqpaypackv2 дотор байдаг тул энд зөвхөн тухайн багцад
-// дамжуулах харилцагчийн лавлагаа (байгууллага/салбар/данс) хадгална.
-export interface IQPayConfiguration {
-  _id: Types.ObjectId; environment: 'sandbox' | 'production'; version: number; merchantName: string;
-  baiguullagiinId: string; salbariinId: string; dansniiDugaar?: string; callbackUrl: string; currency: string;
-  enabled: boolean; isCurrent: boolean; createdBy: Types.ObjectId; createdAt: Date; updatedAt: Date;
-}
-const qpayConfigSchema = new Schema<IQPayConfiguration>({
-  environment: { type: String, enum: ['sandbox', 'production'], required: true, immutable: true },
-  version: { type: Number, required: true, immutable: true },
-  merchantName: { type: String, required: true, immutable: true },
-  baiguullagiinId: { type: String, required: true, immutable: true },
-  salbariinId: { type: String, required: true, immutable: true },
-  dansniiDugaar: { type: String, immutable: true },
-  callbackUrl: { type: String, required: true, immutable: true },
-  currency: { type: String, required: true, immutable: true },
-  enabled: { type: Boolean, default: false, immutable: true },
-  isCurrent: { type: Boolean, default: true },
-  createdBy: { ...ref('User'), required: true, immutable: true },
-}, opts('qpay_configurations'));
-qpayConfigSchema.index({ version: 1 }, { unique: true });
-// Одоогийн хувилбар нь isCurrent=true дундаас хамгийн өндөр дугаартай нь. Шинэ хувилбарыг бичих
-// нэг л атомын үйлдлээр сэлгэнэ: "одоогийн хувилбаргүй" завсар үүсэхгүй.
-qpayConfigSchema.index({ isCurrent: 1, version: -1 });
-export const QPayConfiguration = model<IQPayConfiguration>('QPayConfiguration', qpayConfigSchema);
-
-// ---------- SmsConfiguration (хувилбартай, нууц утгууд шифрлэгдсэн) ----------
-export interface ISmsConfiguration {
-  _id: Types.ObjectId; version: number; provider: 'http' | 'mock'; apiUrl?: string; apiKeyEncrypted?: string;
-  apiSecretEncrypted?: string; apiKeyMask?: string; apiSecretMask?: string; senderId?: string; enabled: boolean;
-  otpExpiryMinutes: number; resendCooldownSeconds: number; maxAttempts: number; isCurrent: boolean;
-  createdBy: Types.ObjectId; createdAt: Date; updatedAt: Date;
-}
-const smsConfigSchema = new Schema<ISmsConfiguration>({
-  version: { type: Number, required: true, immutable: true },
-  provider: { type: String, enum: ['http', 'mock'], required: true },
-  apiUrl: String,
-  apiKeyEncrypted: String,
-  apiSecretEncrypted: String,
-  apiKeyMask: String,
-  apiSecretMask: String,
-  senderId: String,
-  enabled: { type: Boolean, default: false },
-  otpExpiryMinutes: { type: Number, required: true, min: 1, max: 60 },
-  resendCooldownSeconds: { type: Number, required: true, min: 0, max: 3600 },
-  maxAttempts: { type: Number, required: true, min: 1, max: 20 },
-  isCurrent: { type: Boolean, default: true },
-  createdBy: { ...ref('User'), required: true },
-}, opts('sms_configurations'));
-smsConfigSchema.index({ version: 1 }, { unique: true });
-smsConfigSchema.index({ isCurrent: 1, version: -1 });
-export const SmsConfiguration = model<ISmsConfiguration>('SmsConfiguration', smsConfigSchema);
 
 // ---------- VideoJob (FFmpeg дарааллын ажил) ----------
 const videoJobSchema = new Schema({

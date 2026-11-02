@@ -16,7 +16,7 @@ import { VideoConfigurationService } from '../services/videoConfiguration.servic
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors';
 import { escapeRegex, objectId, paged, pageQuery, parse, sortFrom } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
-import { adminCreateSchema, adminRoleSchema, categoryInput, extendSchema, movieInput, refundSchema, userStatusSchema } from '../validators';
+import { adminCreateSchema, adminRoleSchema, categoryInput, extendSchema, movieInput, refundSchema, userPasswordSchema, userStatusSchema } from '../validators';
 import { movieDetail } from './movie.controller';
 
 const idParam = (req: Request, name = 'id') => new Types.ObjectId(parse(objectId, req.params[name]));
@@ -88,6 +88,22 @@ export async function setUserStatus(req: Request, res: Response) {
   res.json(AuthService.view(target));
 }
 
+// SMS-гүй тул мартсан нууц үгийг админ шинэчилнэ. Хуучин сешнүүд хаагдана.
+export async function setUserPassword(req: Request, res: Response) {
+  const id = idParam(req);
+  const { password } = parse(userPasswordSchema, req.body);
+  const target = await User.findById(id);
+  if (!target) throw notFound('Хэрэглэгч олдсонгүй.');
+  if (target.role !== 'user' && req.user!.role !== 'superadmin') throw forbidden('Админы нууц үгийг зөвхөн Superadmin шинэчилнэ.');
+  target.passwordHash = await hashPassword(password);
+  target.failedLoginAttempts = 0;
+  target.lockUntil = undefined;
+  await target.save();
+  await AuthService.revokeUser(id);
+  await logAdmin(req, 'user.password_reset', { type: 'User', id });
+  res.json({ ok: true });
+}
+
 // ---------- Админ удирдлага (зөвхөн Superadmin) ----------
 export async function listAdmins(_req: Request, res: Response) {
   const items = await User.find({ role: { $in: ['admin', 'superadmin'] } }).sort({ createdAt: 1 }).lean();
@@ -100,10 +116,11 @@ export async function createAdmin(req: Request, res: Response) {
   let user = await User.findOne({ phone });
   if (user) {
     user.role = b.role;
+    user.email = b.email;
     await user.save();
   } else {
     if (!b.password) throw badRequest('Шинэ админд нууц үг оруулна уу.');
-    user = await User.create({ phone, passwordHash: await hashPassword(b.password), name: b.name, role: b.role, phoneVerified: true });
+    user = await User.create({ phone, email: b.email, passwordHash: await hashPassword(b.password), name: b.name, role: b.role });
   }
   await logAdmin(req, 'admin.create', { type: 'User', id: user._id }, { role: b.role, phone });
   res.status(201).json(AuthService.view(user));
@@ -117,6 +134,8 @@ export async function setAdminRole(req: Request, res: Response) {
   if (target.role === 'superadmin' && role !== 'superadmin' && (await User.countDocuments({ role: 'superadmin', status: 'active' })) <= 1) {
     throw conflict('Сүүлчийн Superadmin-ы эрхийг хасах боломжгүй.');
   }
+  // Админ зөвхөн имэйлээр нэвтэрдэг тул имэйлгүй хүнийг дэвшүүлбэл нэвтэрч чадахгүй болно.
+  if (role !== 'user' && !target.email) throw badRequest('Энэ хэрэглэгчид имэйл алга. "Админ нэмэх" хэсгээс имэйлтэй нь нэмнэ үү.');
   const before = target.role;
   target.role = role;
   await target.save();
@@ -264,7 +283,7 @@ export async function deleteCategory(req: Request, res: Response) {
 // ---------- Төлбөр ----------
 const adminPayment = (p: any) => ({
   ...PaymentService.view(p), phone: p.userId?.phone, userId: String(p.userId?._id ?? p.userId), invoiceId: p.invoiceId, paymentId: p.paymentId,
-  qpayConfigVersion: p.qpayConfigVersion, pricingVersion: p.pricingVersion, verifiedAt: p.verifiedAt, verificationNote: p.verificationNote, refundNote: p.refundNote,
+  pricingVersion: p.pricingVersion, verifiedAt: p.verifiedAt, verificationNote: p.verificationNote, refundNote: p.refundNote,
 });
 
 export async function listPayments(req: Request, res: Response) {

@@ -20,6 +20,7 @@ export default function AdminUserDetail() {
   const { data: d, error, loading, reload } = useApi<Detail>(`/api/admin/users/${id}`);
   const [days, setDays] = useState(30);
   const [note, setNote] = useState('');
+  const [password, setPassword] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading || !d) return <Skeleton className="h-96" />;
@@ -45,6 +46,14 @@ export default function AdminUserDetail() {
             <Field label="Хоног"><NumberInput min={1} value={days} onChange={setDays} /></Field>
             <Field label="Шалтгаан"><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
             <Button disabled={!note.trim()} onClick={() => void act(() => api(`/api/admin/subscriptions/${id}/extend`, { body: { days, note } }), 'Эрх сунгагдлаа.').then(() => setNote(''))}>Сунгах</Button>
+          </div>
+        </Panel>
+        <Panel>
+          <h2 className="mb-3 font-bold">Нууц үг шинэчлэх</h2>
+          <p className="mb-3 text-xs text-muted-foreground">Хэрэглэгч нууц үгээ мартсан үед. Хуучин бүх сешн хаагдаж, түгжээ арилна.</p>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <Field label="Шинэ нууц үг" hint="Дор хаяж 8 тэмдэгт."><Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+            <Button disabled={password.length < 8} onClick={() => void act(() => api(`/api/admin/users/${id}/password`, { method: 'PATCH', body: { password } }), 'Нууц үг шинэчлэгдлээ.').then(() => setPassword(''))}>Шинэчлэх</Button>
           </div>
         </Panel>
       </div>

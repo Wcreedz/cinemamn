@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { PublicUser } from '@mongolflix/shared';
 import { AuthShell } from '@/components/auth-shell';
-import { OtpFlow } from '@/components/otp-flow';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
@@ -14,7 +13,7 @@ import { api } from '@/lib/api';
 export default function RegisterPage() {
   const router = useRouter();
   const { setUser } = useApp();
-  const [token, setToken] = useState<string | null>(null);
+  const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +22,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setBusy(true); setError(null);
     try {
-      const r = await api<{ user: PublicUser }>('/api/auth/register', { body: { verificationToken: token, password, name } });
+      const r = await api<{ user: PublicUser }>('/api/auth/register', { body: { phone, password, name } });
       setUser(r.user);
       router.push('/subscription');
     } catch (err) {
@@ -33,14 +32,13 @@ export default function RegisterPage() {
   };
   return (
     <AuthShell title="Бүртгүүлэх">
-      {!token ? <OtpFlow purpose="register" onVerified={setToken} /> : (
-        <form onSubmit={(e) => void submit(e)} className="space-y-4">
-          <div><Label htmlFor="name">Нэр</Label><Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="new-password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Дор хаяж 8 тэмдэгт.</p></div>
-          {error && <Notice tone="danger">{error}</Notice>}
-          <Button type="submit" className="w-full" disabled={busy}>Бүртгэл үүсгэх</Button>
-        </form>
-      )}
+      <form onSubmit={(e) => void submit(e)} className="space-y-4">
+        <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+        <div><Label htmlFor="name">Нэр</Label><Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} /></div>
+        <div><Label htmlFor="password">Нууц үг</Label><Input id="password" type="password" autoComplete="new-password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Дор хаяж 8 тэмдэгт.</p></div>
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Үүсгэж байна…' : 'Бүртгэл үүсгэх'}</Button>
+      </form>
       <p className="mt-4 text-sm text-muted-foreground">Бүртгэлтэй юу? <Link href="/login" className="text-primary hover:underline">Нэвтрэх</Link></p>
     </AuthShell>
   );

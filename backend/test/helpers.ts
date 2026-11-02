@@ -5,10 +5,8 @@ import request from 'supertest';
 import { createApp } from '../src/app';
 import { User, Category, Movie } from '../src/models';
 import { hashPassword } from '../src/services/auth.service';
+import { BAIGUULLAGIIN_ID, BARILGIIN_ID } from '../src/services/qpay.gateway';
 import { SettingsService } from '../src/services/settings.service';
-import { QPayConfigurationService } from '../src/services/qpayConfiguration.service';
-import { SmsConfigurationService } from '../src/services/smsConfiguration.service';
-import { QPayGateway } from '../src/services/qpay.gateway';
 
 let mongo: MongoMemoryServer;
 export const app = createApp();
@@ -28,8 +26,6 @@ export async function resetDb() {
   await Promise.all(Object.values(mongoose.models).map((m) => m.deleteMany({})));
   await mongoose.connection.db.collection('token').deleteMany({});
   SettingsService.invalidate();
-  QPayConfigurationService.invalidate();
-  SmsConfigurationService.invalidate();
 }
 
 let counter = 0;
@@ -38,11 +34,14 @@ export const nextPhone = () => `+9769${String(1000000 + ++counter).slice(-7)}`;
 export async function login(role: 'user' | 'admin' | 'superadmin' = 'user') {
   const phone = nextPhone();
   const password = 'Test-password-123';
-  const user = await User.create({ phone, passwordHash: await hashPassword(password), role, phoneVerified: true, name: role });
+  const email = role === 'user' ? undefined : `a${phone.slice(1)}@example.com`;
+  const user = await User.create({ phone, email, passwordHash: await hashPassword(password), role, name: role });
   const agent = request.agent(app);
-  const res = await agent.post('/api/auth/login').send({ phone, password });
+  const res = role === 'user'
+    ? await agent.post('/api/auth/login').send({ phone, password })
+    : await agent.post('/api/auth/admin/login').send({ email, password, remember: true });
   if (res.status !== 200) throw new Error(`login failed ${res.status}`);
-  return { user, agent, phone, password };
+  return { user, agent, phone, email, password };
 }
 
 export async function makeMovie(over: Record<string, unknown> = {}) {
@@ -56,7 +55,7 @@ export class FakeQPay {
   invoices = new Map<string, FakeInvoice>();
   authCalls = 0;
   checkCalls = 0;
-  merchantCalls = 0;
+  merchantRequests = 0;
   rejectAuth = false;
   checkOverride: ((inv: FakeInvoice | undefined) => Record<string, unknown>) | null = null;
   private server: http.Server;
@@ -70,7 +69,7 @@ export class FakeQPay {
   }
   start() { return new Promise<void>((r) => this.server.listen(18931, '127.0.0.1', r)); }
   stop() { return new Promise((r) => this.server.close(r)); }
-  reset() { this.invoices.clear(); this.authCalls = 0; this.checkCalls = 0; this.rejectAuth = false; this.checkOverride = null; }
+  reset() { this.invoices.clear(); this.authCalls = 0; this.checkCalls = 0; this.merchantRequests = 0; this.rejectAuth = false; this.checkOverride = null; }
   markPaid(id: string, paidAmount?: number, currency = 'MNT') {
     const inv = this.invoices.get(id)!;
     inv.status = 'PAID'; inv.paidAmount = paidAmount ?? inv.amount; inv.currency = currency;
@@ -88,9 +87,9 @@ export class FakeQPay {
       if (this.rejectAuth) return this.send(res, 401, { error: 'NO_CREDENTIALS', message: 'NO_CREDENTIALS' });
       return this.send(res, 200, { access_token: `token-${this.authCalls}`, refresh_token: 'r', expires_in: Math.floor(Date.now() / 1000) + 3600 });
     }
-    if (url.startsWith('/v2/merchant/')) {
-      this.merchantCalls++;
-      return this.send(res, 200, { id: `registered-${this.merchantCalls}`, type: url.includes('person') ? 'PERSON' : 'COMPANY' });
+    if (url.startsWith('/v2/merchant')) {
+      this.merchantRequests++;
+      return this.send(res, 200, { id: 'unexpected' });
     }
     if (url.startsWith('/v2/invoice')) {
       const id = `inv-${this.invoices.size + 1}-${Date.now()}`;
@@ -113,18 +112,19 @@ export class FakeQPay {
 
 export async function seedMerchant() {
   // Туршилтын зохиомол харилцагч: багцын бодит QpayKhariltsagch бүтэцтэй ижил.
-  await QPayGateway.merchants().deleteMany({});
-  await QPayGateway.merchants().create({
-    type: 'COMPANY', baiguullagiinId: 'org-1', register_number: '1111111', name: 'Тест ХХК', mcc_code: '5641',
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const QpayKhariltsagch = require('quickqpaypackv2').QpayKhariltsagch({ kholbolt: mongoose.connection });
+  await QpayKhariltsagch.deleteMany({});
+  await QpayKhariltsagch.create({
+    type: 'COMPANY', baiguullagiinId: BAIGUULLAGIIN_ID, register_number: '1111111', name: 'Тест ХХК', mcc_code: '5641',
     merchant_idFalse: 'merchant-false', merchant_idTrue: 'merchant-true', city: '11000', district: '17000', address: 'х', phone: '99000000', email: 't@example.com',
     salbaruud: [{
-      salbariinId: 'branch-1', salbariinNer: 'Төв', qpayShimtgelTurul: false,
+      salbariinId: BARILGIIN_ID, salbariinNer: 'Төв', qpayShimtgelTurul: false,
       bank_accounts: [{ account_bank_code: '050000', account_number: '1000000001', account_name: 'Тест', qpayShimtgelTurul: false }],
+    }, {
+      salbariinId: 'previous-branch', salbariinNer: 'Хуучин', qpayShimtgelTurul: false,
+      bank_accounts: [{ account_bank_code: '050000', account_number: '1000000002', account_name: 'Тест', qpayShimtgelTurul: false }],
     }],
   });
 }
 
-export const qpayInput = (over: Record<string, unknown> = {}) => ({
-  environment: 'sandbox', merchantName: 'Тест', baiguullagiinId: 'org-1', salbariinId: 'branch-1', dansniiDugaar: '',
-  callbackUrl: 'http://localhost:4100/api/payments/qpay/callback', currency: 'MNT', enabled: true, ...over,
-});

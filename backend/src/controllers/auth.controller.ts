@@ -1,52 +1,23 @@
 import type { Request, Response } from 'express';
 import { clearAuthCookies, setAuthCookies } from '../middleware/auth';
-import { User } from '../models';
-import { AuthService, hashPassword } from '../services/auth.service';
-import { OtpService } from '../services/otp.service';
+import { AuthService } from '../services/auth.service';
 import { unauthorized } from '../utils/errors';
 import { clientIp, parse } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
-import { loginSchema, profileSchema, registerSchema, resetSchema, sendOtpSchema, verifyOtpSchema } from '../validators';
+import { adminLoginSchema, changePasswordSchema, loginSchema, profileSchema, registerSchema } from '../validators';
 
 const meta = (req: Request) => ({ ip: clientIp(req), userAgent: req.headers['user-agent'] });
 
-async function startSession(req: Request, res: Response, user: { _id: any; role: any }) {
-  const s = await AuthService.issueSession(user._id, meta(req));
-  setAuthCookies(res, AuthService.signAccess(user, s.familyId), s.refreshToken, s.expiresAt);
-}
-
-export async function sendOtp(req: Request, res: Response) {
-  const { phone, purpose } = parse(sendOtpSchema, req.body);
-  const normalized = normalizePhone(phone);
-  const exists = await User.exists({ phone: normalized });
-  // Дугаар бүртгэлтэй эсэхийг нууж, зөвхөн тохирох тохиолдолд л SMS илгээнэ.
-  if ((purpose === 'register' && exists) || (purpose === 'reset' && !exists)) {
-    return res.json({ sent: true, resendCooldownSeconds: 60 });
-  }
-  const r = await OtpService.send(normalized, purpose);
-  res.json({ sent: true, ...r });
-}
-
-export async function verifyOtp(req: Request, res: Response) {
-  const { phone, purpose, code } = parse(verifyOtpSchema, req.body);
-  res.json({ verificationToken: await OtpService.verify(normalizePhone(phone), purpose, code) });
+async function startSession(req: Request, res: Response, user: { _id: any; role: any }, persistent = true) {
+  const s = await AuthService.issueSession(user._id, meta(req), { persistent });
+  setAuthCookies(res, AuthService.signAccess(user, s.familyId), s.refreshToken, s.expiresAt, s.persistent);
 }
 
 export async function register(req: Request, res: Response) {
-  const { verificationToken, password, name } = parse(registerSchema, req.body);
-  const phone = await OtpService.consumeVerification(verificationToken, 'register');
-  const user = await AuthService.register(phone, password, name);
+  const { phone, password, name } = parse(registerSchema, req.body);
+  const user = await AuthService.register(normalizePhone(phone), password, name);
   await startSession(req, res, user);
   res.status(201).json({ user: AuthService.view(user) });
-}
-
-export async function resetPassword(req: Request, res: Response) {
-  const { verificationToken, password } = parse(resetSchema, req.body);
-  const phone = await OtpService.consumeVerification(verificationToken, 'reset');
-  const user = await User.findOneAndUpdate({ phone }, { $set: { passwordHash: await hashPassword(password), failedLoginAttempts: 0 }, $unset: { lockUntil: 1 } });
-  if (!user) throw unauthorized();
-  await AuthService.revokeUser(user._id);
-  res.json({ ok: true });
 }
 
 export async function login(req: Request, res: Response) {
@@ -56,12 +27,19 @@ export async function login(req: Request, res: Response) {
   res.json({ user: AuthService.view(user) });
 }
 
+export async function adminLogin(req: Request, res: Response) {
+  const { email, password, remember } = parse(adminLoginSchema, req.body);
+  const user = await AuthService.loginAdmin(email, password);
+  await startSession(req, res, user, remember);
+  res.json({ user: AuthService.view(user) });
+}
+
 export async function refresh(req: Request, res: Response) {
   const token = req.cookies?.mf_refresh;
   if (!token) throw unauthorized();
   try {
     const r = await AuthService.rotate(token, meta(req));
-    setAuthCookies(res, AuthService.signAccess(r.user, r.familyId), r.refreshToken, r.expiresAt);
+    setAuthCookies(res, AuthService.signAccess(r.user, r.familyId), r.refreshToken, r.expiresAt, r.persistent);
     res.json({ user: AuthService.view(r.user) });
   } catch (err) {
     clearAuthCookies(res);
@@ -77,6 +55,14 @@ export async function logout(req: Request, res: Response) {
 
 export async function me(req: Request, res: Response) {
   res.json({ user: AuthService.view(req.user!) });
+}
+
+export async function changePassword(req: Request, res: Response) {
+  const { currentPassword, newPassword } = parse(changePasswordSchema, req.body);
+  await AuthService.changePassword(req.user!._id, currentPassword, newPassword);
+  // Бусад төхөөрөмж гарсан, энэ төхөөрөмж шинэ сешнтэй үргэлжилнэ.
+  await startSession(req, res, req.user!);
+  res.json({ ok: true });
 }
 
 export async function updateProfile(req: Request, res: Response) {

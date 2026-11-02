@@ -4,11 +4,11 @@ import { objectId } from '../utils/http';
 export const phoneField = z.string().trim().min(8).max(20);
 export const passwordField = z.string().min(8, 'Нууц үг дор хаяж 8 тэмдэгт байна').max(128);
 
-export const sendOtpSchema = z.object({ phone: phoneField, purpose: z.enum(['register', 'reset']).default('register') });
-export const verifyOtpSchema = z.object({ phone: phoneField, purpose: z.enum(['register', 'reset']).default('register'), code: z.string().regex(/^\d{6}$/, '6 оронтой код оруулна уу') });
-export const registerSchema = z.object({ verificationToken: z.string().min(10), password: passwordField, name: z.string().trim().max(80).default('') });
-export const resetSchema = z.object({ verificationToken: z.string().min(10), password: passwordField });
+export const registerSchema = z.object({ phone: phoneField, password: passwordField, name: z.string().trim().max(80).default('') });
 export const loginSchema = z.object({ phone: phoneField, password: z.string().min(1).max(128) });
+export const emailField = z.string().trim().toLowerCase().max(254).email('Имэйл хаяг буруу байна');
+export const adminLoginSchema = z.object({ email: emailField, password: z.string().min(1).max(128), remember: z.boolean().default(false) });
+export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: passwordField });
 export const profileSchema = z.object({ name: z.string().trim().max(80) });
 
 export const movieInput = z.object({
@@ -49,31 +49,6 @@ export const watchProgressSchema = z.object({ progressSeconds: z.number().min(0)
 export const extendSchema = z.object({ days: z.number().int().min(1).max(3660), note: z.string().trim().min(1, 'Шалтгаан бичнэ үү').max(500) });
 export const refundSchema = z.object({ note: z.string().trim().min(1, 'Шалтгаан бичнэ үү').max(500) });
 export const userStatusSchema = z.object({ status: z.enum(['active', 'blocked']) });
-export const adminCreateSchema = z.object({ phone: phoneField, password: passwordField.optional(), name: z.string().trim().max(80).default(''), role: z.enum(['admin', 'superadmin']) });
+export const adminCreateSchema = z.object({ email: emailField, phone: phoneField, password: passwordField.optional(), name: z.string().trim().max(80).default(''), role: z.enum(['admin', 'superadmin']) });
 export const adminRoleSchema = z.object({ role: z.enum(['user', 'admin', 'superadmin']) });
-export const smsTestSchema = z.object({ phone: phoneField });
-export const merchantInput = z.object({
-  type: z.enum(['COMPANY', 'PERSON']),
-  baiguullagiinId: z.string().trim().min(1),
-  register_number: z.string().trim().min(1),
-  name: z.string().trim().optional(),
-  first_name: z.string().trim().optional(),
-  last_name: z.string().trim().optional(),
-  mcc_code: z.string().trim().min(1),
-  city: z.string().trim().min(1),
-  district: z.string().trim().min(1),
-  address: z.string().trim().min(1),
-  phone: z.string().trim().min(1),
-  email: z.string().trim().email(),
-  salbaruud: z.array(z.object({
-    salbariinId: z.string().trim().min(1),
-    salbariinNer: z.string().trim().min(1),
-    qpayShimtgelTurul: z.boolean().default(false),
-    bank_accounts: z.array(z.object({
-      account_bank_code: z.string().trim().regex(/^(\d{6}|TOKI)$/),
-      account_number: z.string().trim().min(1),
-      account_name: z.string().trim().min(1),
-      qpayShimtgelTurul: z.boolean().default(false),
-    })).min(1),
-  })).min(1),
-});
+export const userPasswordSchema = z.object({ password: passwordField });

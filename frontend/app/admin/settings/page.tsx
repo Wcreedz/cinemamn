@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Paginated } from '@mongolflix/shared';
-import { AdminsTab, AllSettings, GeneralTab, HomepageTab, PaymentTab, QPayTab, SecurityTab, SmsTab, SubscriptionTab, VideoTab } from '@/components/admin/settings-tabs';
+import { AdminsTab, AllSettings, GeneralTab, HomepageTab, PaymentTab, SecurityTab, SubscriptionTab, VideoTab } from '@/components/admin/settings-tabs';
 import { LogTable, type LogRow } from '@/components/admin/log-table';
 import { PageHeader, Pager } from '@/components/admin/ui';
 import { ErrorState, Skeleton } from '@/components/ui/misc';
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApi } from '@/hooks/use-api';
 
 const TABS = [
-  ['general', 'Ерөнхий'], ['subscription', 'Эрхийн багц'], ['payment', 'Төлбөр'], ['qpay', 'QPay тохиргоо'], ['sms', 'SMS тохиргоо'],
+  ['general', 'Ерөнхий'], ['subscription', 'Эрхийн багц'], ['payment', 'Төлбөр'],
   ['video', 'Видео'], ['homepage', 'Нүүр хуудас'], ['security', 'Аюулгүй байдал'], ['admins', 'Админ удирдлага'], ['history', 'Өөрчлөлтийн түүх'],
 ] as const;
 
@@ -34,8 +34,6 @@ export default function AdminSettingsPage() {
         <TabsContent value="general"><GeneralTab entry={data.general} reload={reload} /></TabsContent>
         <TabsContent value="subscription"><SubscriptionTab entry={data.subscription} reload={reload} /></TabsContent>
         <TabsContent value="payment"><PaymentTab entry={data.subscription} reload={reload} /></TabsContent>
-        <TabsContent value="qpay"><QPayTab /></TabsContent>
-        <TabsContent value="sms"><SmsTab /></TabsContent>
         <TabsContent value="video"><VideoTab entry={data.video} roots={data.videoAllowedRoots} reload={reload} /></TabsContent>
         <TabsContent value="homepage"><HomepageTab entry={data.homepage} reload={reload} /></TabsContent>
         <TabsContent value="security"><SecurityTab entry={data.security} reload={reload} /></TabsContent>

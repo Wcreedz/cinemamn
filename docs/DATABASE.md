@@ -6,7 +6,7 @@ Mongoose 6 хувилбарыг санаатай сонгосон: `quickqpaypac
 
 ## Цуглуулгууд
 
-`users`, `otps` (TTL), `refresh_sessions` (TTL), `categories`, `movies` (text index), `subscriptions`, `payments`, `watch_history`, `playback_sessions` (TTL), `admin_logs`, `system_settings`, `qpay_configurations`, `sms_configurations`, `video_jobs`. Багцын цуглуулгууд: `QpayKhariltsagch`, `QuickQpayObject`, `token`.
+`users`, `refresh_sessions` (TTL), `categories`, `movies` (text index), `subscriptions`, `payments`, `watch_history`, `playback_sessions` (TTL), `admin_logs`, `system_settings`, `video_jobs`. Багцын цуглуулгууд: `QpayKhariltsagch`, `QuickQpayObject`, `token`.
 
 Схем, индексүүд: [backend/src/models/index.ts](../backend/src/models/index.ts).
 
@@ -15,8 +15,7 @@ Mongoose 6 хувилбарыг санаатай сонгосон: `quickqpaypac
 - `payments.orderNumber` unique, `payments.invoiceId` partial unique
 - `subscriptions.paymentId` partial unique: нэг төлбөрөөс нэг эрх
 - `subscriptions (userId, seq)` unique: зэрэгцээ төлбөрүүд хугацаагаа давхцуулахгүй
-- `payments.amount/currency/durationDays/qpayConfigVersion...` immutable
-- `qpay_configurations.version`, `sms_configurations.version` unique. Одоогийн хувилбар нь `isCurrent` дундаас хамгийн өндөр дугаартай нь
+- `payments.amount/currency/durationDays/qpayBaiguullagiinId...` immutable
 
 ## Transaction-гүй төлбөрийн баталгаа
 
@@ -30,4 +29,4 @@ Mongoose 6 хувилбарыг санаатай сонгосон: `quickqpaypac
 
 ## Нөөцлөлт
 
-`infrastructure/backup/backup.sh` (cron), `restore.sh`. `SETTINGS_ENCRYPTION_KEY`-г нөөцөөс тусад нь аюулгүй хадгална: алдвал SMS нэвтрэх мэдээллийг дахин оруулна.
+`infrastructure/backup/backup.sh` (cron), `restore.sh`.

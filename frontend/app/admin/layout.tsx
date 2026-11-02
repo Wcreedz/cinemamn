@@ -30,11 +30,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, loading, settings } = useApp();
   const [open, setOpen] = useState(false);
   const active = (href: string) => (href === '/admin' ? path === '/admin' : path.startsWith(href));
+  // Нэвтрэх хуудас нь цэс, эрхийн шалгалтгүй, зөвхөн theme-ийг өвлөнө.
+  if (path === '/admin/login') return <div className="admin-theme bg-background text-foreground">{children}</div>;
 
   let body: React.ReactNode = children;
   // Энэ нь зөвхөн UX: бодит хамгаалалт backend-ийн requireAdmin дээр байна.
   if (loading) body = <Skeleton className="h-64" />;
-  else if (!user) body = <div className="py-20 text-center"><p className="mb-4 font-semibold">Нэвтрэх шаардлагатай.</p><Button asChild><Link href="/login?next=/admin">Нэвтрэх</Link></Button></div>;
+  else if (!user) body = <div className="py-20 text-center"><p className="mb-4 font-semibold">Нэвтрэх шаардлагатай.</p><Button asChild><Link href="/admin/login">Нэвтрэх</Link></Button></div>;
   else if (user.role === 'user') body = <p className="py-20 text-center font-semibold">Энэ хэсэгт хандах эрхгүй байна.</p>;
 
   return (
@@ -44,7 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Link href="/admin" className="text-xl font-black text-primary">{settings?.general.siteName ?? 'MongolFlix'} <span className="text-xs font-semibold uppercase text-muted-foreground">Админ</span></Link>
         <div className="ml-auto flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm">
           <span className="size-2 rounded-full bg-success" aria-hidden />
-          <span className="font-semibold">{user?.phone}</span>
+          <span className="font-semibold">{user?.email ?? user?.phone}</span>
           {user && <span className="text-xs text-muted-foreground">{user.role}</span>}
         </div>
         <Button asChild variant="ghost" size="sm"><Link href="/">Сайт</Link></Button>

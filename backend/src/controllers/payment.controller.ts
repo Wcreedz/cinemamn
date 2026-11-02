@@ -39,9 +39,9 @@ export async function history(req: Request, res: Response) {
 
 // QPay callback. Хүсэлтийн агуулгад итгэхгүй: зөвхөн захиалгын дугаараар олж, QPay-с шууд шалгана.
 export async function callback(req: Request, res: Response) {
-  const order = String(req.query.order ?? req.params.orderNumber ?? '');
+  const order = String(req.params.zakhialgiinDugaar);
   if (!/^MF[A-Z0-9]{8,40}$/.test(order)) return res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Захиалгын дугаар буруу байна.' } });
-  const payment = await Payment.findOne({ orderNumber: order }).select('_id').lean();
+  const payment = await Payment.findOne({ orderNumber: order, qpayBaiguullagiinId: String(req.params.baiguullagiinId) }).select('_id').lean();
   if (!payment) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Захиалга олдсонгүй.' } });
   try {
     const outcome = await PaymentService.verifyFromCallback(payment._id);

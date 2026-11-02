@@ -13,9 +13,9 @@ const cookieBase = () => ({
 });
 const REFRESH_PATH = '/api/auth';
 
-export function setAuthCookies(res: Response, access: string, refresh: string, refreshExpires: Date) {
+export function setAuthCookies(res: Response, access: string, refresh: string, refreshExpires: Date, persistent = true) {
   res.cookie('mf_access', access, { ...cookieBase(), path: '/', maxAge: ACCESS_TTL_SECONDS * 1000 });
-  res.cookie('mf_refresh', refresh, { ...cookieBase(), path: REFRESH_PATH, expires: refreshExpires });
+  res.cookie('mf_refresh', refresh, { ...cookieBase(), path: REFRESH_PATH, ...(persistent ? { expires: refreshExpires } : {}) });
 }
 export function clearAuthCookies(res: Response) {
   res.clearCookie('mf_access', { ...cookieBase(), path: '/' });

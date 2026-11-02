@@ -21,8 +21,6 @@ worker (Node) ── FFmpeg ──▶ /srv/mongolflix/hls        MongoDB
 |---|---|---|
 | `SettingsService` | `system_settings` | general, subscription, video, security, homepage |
 | `SubscriptionPricingService` | subscription setting | Багц, үнэ. Нэхэмжлэхэд үргэлж кэшгүй уншина |
-| `QPayConfigurationService` | `qpay_configurations` | Хувилбартай QPay лавлагаа |
-| `SmsConfigurationService` | `sms_configurations` | Хувилбартай, шифрлэгдсэн SMS тохиргоо, OTP дүрэм |
 | `VideoConfigurationService` | video setting | Хадгалах зам, чанар, FFmpeg |
 
 Кэш нь процесс доторх 30 секундын TTL-тэй, хадгалмагц тухайн процесст цэвэрлэгдэнэ. Worker эсвэл өөр API процесс хамгийн ихдээ 30 секунд хоцорно. Анхны утгууд зөвхөн `settings.service.ts`-д байна.
@@ -31,8 +29,8 @@ worker (Node) ── FFmpeg ──▶ /srv/mongolflix/hls        MongoDB
 
 ## Төлбөрийн урсгал
 
-1. `POST /payments/qpay/create`: зөвхөн `planCode` уншина. Үнэ, хугацааг баазаас шууд авч, тохиргооны хувилбарын хамт өөрчлөгдөшгүй хадгална.
+1. `POST /payments/qpay/create`: зөвхөн `planCode` уншина. Үнэ, хугацааг баазаас шууд авч, merchant-ийн лавлагааны хамт өөрчлөгдөшгүй хадгална.
 2. `qpayGargaya` QR буцаана.
-3. QPay callback → `verifyFromCallback` → `qpayShalgay` тухайн нэхэмжлэхийн хувилбарын лавлагаагаар шалгана.
+3. QPay callback → `verifyFromCallback` → `qpayShalgay` тухайн нэхэмжлэхийн merchant-ийн лавлагаагаар шалгана.
 4. Нэхэмжлэхийн дугаар, PAID төлөв, дүн, валютыг тулгана.
 5. `applyPaid`: `pending→paid` нөхцөлт шинэчлэлт, дараа нь `paymentId` unique эрх үүсгэлт. Давхар callback эхний алхамд зогсоно. Дундаа тасарвал worker нөхнө ([DATABASE.md](DATABASE.md)).

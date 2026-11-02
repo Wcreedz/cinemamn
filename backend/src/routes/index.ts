@@ -19,15 +19,14 @@ api.get('/health', (_req, res) => {
 });
 
 // Нэвтрэлт
-api.post('/auth/send-otp', authLimiter, auth.sendOtp);
-api.post('/auth/verify-otp', authLimiter, auth.verifyOtp);
 api.post('/auth/register', authLimiter, auth.register);
-api.post('/auth/reset-password', authLimiter, auth.resetPassword);
 api.post('/auth/login', authLimiter, auth.login);
+api.post('/auth/admin/login', authLimiter, auth.adminLogin);
 api.post('/auth/refresh', authLimiter, auth.refresh);
 api.post('/auth/logout', optionalAuth, auth.logout);
 api.get('/auth/me', requireAuth, auth.me);
 api.patch('/auth/me', requireAuth, auth.updateProfile);
+api.post('/auth/change-password', authLimiter, requireAuth, auth.changePassword);
 
 // Нийтийн тохиргоо
 api.get('/settings/public', settings.publicSettings);
@@ -48,8 +47,7 @@ api.get('/subscriptions/history', requireAuth, subs.history);
 
 // Төлбөр. Callback дээр нэвтрэлт байхгүй; зөвхөн QPay-с шууд шалгасан үр дүнд итгэнэ.
 api.post('/payments/qpay/create', requireAuth, payments.create);
-api.all('/payments/qpay/callback', payments.callback);
-api.all('/payments/qpay/callback/:orderNumber', payments.callback);
+api.all('/qpaycallback/:baiguullagiinId/:zakhialgiinDugaar', payments.callback);
 api.get('/payments/history', requireAuth, payments.history);
 api.get('/payments/:id', requireAuth, payments.byId);
 api.post('/payments/:id/check', requireAuth, payments.check);
@@ -68,6 +66,7 @@ a.get('/dashboard', admin.dashboard);
 a.get('/users', admin.listUsers);
 a.get('/users/:id', admin.getUser);
 a.patch('/users/:id/status', admin.setUserStatus);
+a.patch('/users/:id/password', admin.setUserPassword);
 a.get('/admins', requireSuperadmin, admin.listAdmins);
 a.post('/admins', requireSuperadmin, admin.createAdmin);
 a.patch('/admins/:id/role', requireSuperadmin, admin.setAdminRole);
@@ -97,14 +96,4 @@ a.put('/settings/video', settings.updateSection('video'));
 a.put('/settings/security', settings.updateSection('security'));
 a.put('/settings/homepage', settings.updateSection('homepage'));
 a.get('/settings/history', settings.history);
-a.get('/settings/qpay', settings.getQPay);
-a.post('/settings/qpay', settings.saveQPay);
-a.post('/settings/qpay/test', settings.testQPay);
-a.post('/settings/qpay/verify', settings.verifyQPay);
-a.delete('/settings/qpay/versions/:id', requireSuperadmin, settings.deleteQPayVersion);
-a.get('/settings/qpay/merchant', settings.getMerchant);
-a.post('/settings/qpay/merchant', requireSuperadmin, settings.saveMerchant);
-a.get('/settings/sms', settings.getSms);
-a.post('/settings/sms', settings.saveSms);
-a.post('/settings/sms/test', settings.testSms);
 api.use('/admin', a);

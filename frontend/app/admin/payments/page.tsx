@@ -10,7 +10,7 @@ import { useApi } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 import { dateTime, money } from '@/lib/utils';
 
-type Row = PaymentView & { phone?: string; invoiceId?: string; qpayConfigVersion?: number; verificationNote?: string };
+type Row = PaymentView & { phone?: string; invoiceId?: string; verificationNote?: string };
 const TONE = { paid: 'success', pending: 'warning', failed: 'danger', expired: 'neutral', refunded: 'neutral' } as const;
 
 export default function AdminPayments() {
@@ -53,14 +53,13 @@ export default function AdminPayments() {
       {msg && <Notice tone={msg.ok ? 'success' : 'danger'} className="mb-4">{msg.text}</Notice>}
       {error ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : !data?.items.length ? <EmptyState title="Төлбөр олдсонгүй" /> : (
         <>
-          <Table head={['Захиалга', 'Утас', 'Дүн', 'Төлөв', 'Тохиргоо', 'Огноо', '']}>
+          <Table head={['Захиалга', 'Утас', 'Дүн', 'Төлөв', 'Огноо', '']}>
             {data.items.map((p) => (
               <tr key={p.id}>
                 <td className="px-4 py-3"><p className="font-mono text-xs">{p.orderNumber}</p><p className="max-w-52 truncate text-xs text-muted-foreground" title={p.invoiceId}>{p.invoiceId}</p></td>
                 <td className="px-4 py-3">{p.phone}</td>
                 <td className="px-4 py-3 font-semibold">{money(p.amount, p.currency)}</td>
                 <td className="px-4 py-3"><Badge tone={TONE[p.status]}>{p.status}</Badge>{p.failureReason && <p className="mt-1 text-xs text-destructive">{p.failureReason}</p>}{p.verificationNote && <p className="mt-1 max-w-52 text-xs text-muted-foreground">{p.verificationNote}</p>}</td>
-                <td className="px-4 py-3">v{p.qpayConfigVersion}</td>
                 <td className="px-4 py-3">{dateTime(p.createdAt)}</td>
                 <td className="space-x-1 whitespace-nowrap px-4 py-3 text-right">
                   {(p.status === 'pending' || p.status === 'expired') && <Button size="sm" variant="outline" onClick={() => void verify(p)}>QPay-с шалгах</Button>}

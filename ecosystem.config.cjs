@@ -10,7 +10,7 @@ const logs = path.join(__dirname, 'logs');
 const common = {
   node_args: `--env-file=${ENV_FILE}`,
   // --env-file одоо байгаа утгыг дарж бичдэггүй тул .env-д development үлдсэн ч PM2 дээр
-  // төлбөрийн симулятор, mock SMS хэзээ ч нээгдэхгүй.
+  // төлбөрийн симулятор хэзээ ч нээгдэхгүй.
   env: { NODE_ENV: 'production' },
   instances: 1,
   exec_mode: 'fork',

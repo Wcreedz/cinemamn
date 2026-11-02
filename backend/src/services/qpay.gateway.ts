@@ -1,12 +1,15 @@
 import mongoose, { Connection } from 'mongoose';
 import { env } from '../config/env';
 import { AppError, unavailable } from '../utils/errors';
-import type { IQPayConfiguration } from '../models';
 
-// QPay-н бүх дуудлага quickqpaypackv2 сангаар дамжина. Сан нь нэвтрэх мэдээллээ өөрөө
-// удирддаг тул MongolFlix зөвхөн харилцагчийн лавлагаа болон дүнг дамжуулна.
+// QPay-н бүх дуудлага quickqpaypackv2 сангаар дамжина. Нэвтрэх мэдээллийг сан өөрөө удирдаж,
+// merchant, дансыг баазын QpayKhariltsagch баримтаас уншина.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pack = () => require('quickqpaypackv2') as typeof import('quickqpaypackv2');
+
+// MongolFlix-ийн төлбөр орох QpayKhariltsagch баримт, салбар (Cinema).
+export const BAIGUULLAGIIN_ID = '612f457d185280db676d0b51';
+export const BARILGIIN_ID = '622ca3938e64e5b4f0c36be9';
 
 let packConn: Connection | null = null;
 
@@ -16,17 +19,8 @@ function kholbolt() {
   return { kholbolt: packConn };
 }
 
-export function serverEnvironment(): 'sandbox' | 'production' | null {
-  if (env.QPAY_SERVER_ENV) return env.QPAY_SERVER_ENV;
-  if (!env.QPAY_MERCHANT_SERVER) return null;
-  const host = new URL(env.QPAY_MERCHANT_SERVER).hostname;
-  if (host === 'merchant.qpay.mn') return 'production';
-  if (host === 'merchant-sandbox.qpay.mn') return 'sandbox';
-  return null;
-}
-
 function ensureServer() {
-  if (!env.QPAY_MERCHANT_SERVER) throw unavailable('QPAY_SERVER_MISSING', 'QPAY_MERCHANT_SERVER орчны хувьсагч тохируулаагүй байна.');
+  if (!env.QPAY_MERCHANT_SERVER) throw unavailable('QPAY_NOT_CONFIGURED', 'QPay төлбөр одоогоор тохируулагдаагүй байна.');
   // Сан хаягийг шууд залгадаг тул төгсгөлийн / заавал байх ёстой.
   process.env.QPAY_MERCHANT_SERVER = env.QPAY_MERCHANT_SERVER.replace(/\/*$/, '/');
 }
@@ -37,6 +31,8 @@ function assertObject(result: unknown): asserts result is Record<string, any> {
     throw new AppError(502, 'QPAY_MERCHANT_NOT_FOUND', typeof result === 'string' ? result : 'QPay-с хоосон хариу ирлээ.');
   }
 }
+
+export interface MerchantRef { baiguullagiinId: string; barilgiinId: string }
 
 export interface InvoiceResult {
   invoiceId: string;
@@ -68,16 +64,25 @@ export function parseCheckResponse(raw: Record<string, any>): CheckResult {
 }
 
 export const QPayGateway = {
-  async createInvoice(cfg: IQPayConfiguration, o: { amount: number; orderNumber: string; description: string; callbackUrl: string }): Promise<InvoiceResult> {
+  ref(): MerchantRef {
+    return { baiguullagiinId: BAIGUULLAGIIN_ID, barilgiinId: BARILGIIN_ID };
+  },
+
+  // Дутуу тохиргоотой үед төлбөрийн бичлэг үүсгэхээс өмнө зогсооно.
+  assertConfigured() {
+    if (!env.QPAY_MERCHANT_SERVER || !env.UNDSEN_SERVER) throw unavailable('QPAY_NOT_CONFIGURED', 'QPay төлбөр одоогоор тохируулагдаагүй байна.');
+  },
+
+  async createInvoice(ref: MerchantRef, o: { amount: number; orderNumber: string; description: string }): Promise<InvoiceResult> {
     ensureServer();
+    const callbackUrl = `${env.UNDSEN_SERVER!.replace(/\/+$/, '')}/qpaycallback/${ref.baiguullagiinId}/${o.orderNumber}`;
     const res = await pack().qpayGargaya({
-      baiguullagiinId: cfg.baiguullagiinId,
-      barilgiinId: cfg.salbariinId,
-      dansniiDugaar: cfg.dansniiDugaar || undefined,
+      baiguullagiinId: ref.baiguullagiinId,
+      barilgiinId: ref.barilgiinId,
       dun: o.amount,
       tailbar: o.description,
       zakhialgiinDugaar: o.orderNumber,
-    }, o.callbackUrl, kholbolt());
+    }, callbackUrl, kholbolt());
     assertObject(res);
     const invoiceId = res.id ?? res.invoice_id;
     if (!invoiceId) throw new AppError(502, 'QPAY_BAD_RESPONSE', 'QPay нэхэмжлэхийн дугаар буцаасангүй.');
@@ -92,23 +97,10 @@ export const QPayGateway = {
     };
   },
 
-  async checkInvoice(cfg: IQPayConfiguration, invoiceId: string): Promise<CheckResult> {
+  async checkInvoice(ref: MerchantRef, invoiceId: string): Promise<CheckResult> {
     ensureServer();
-    const res = await pack().qpayShalgay({
-      baiguullagiinId: cfg.baiguullagiinId,
-      barilgiinId: cfg.salbariinId,
-      dansniiDugaar: cfg.dansniiDugaar || undefined,
-      id: invoiceId,
-    }, kholbolt());
+    const res = await pack().qpayShalgay({ baiguullagiinId: ref.baiguullagiinId, barilgiinId: ref.barilgiinId, id: invoiceId }, kholbolt());
     assertObject(res);
     return parseCheckResponse(res);
-  },
-
-  merchants: () => pack().QpayKhariltsagch(kholbolt()),
-
-  async saveMerchant(input: Record<string, unknown>) {
-    ensureServer();
-    const res = await pack().qpayKhariltsagchUusgey(input, kholbolt());
-    if (res !== 'Amjilttai') throw new AppError(502, 'QPAY_MERCHANT_SAVE_FAILED', typeof res === 'string' ? res : 'QPay харилцагч хадгалахад алдаа гарлаа.');
   },
 };
