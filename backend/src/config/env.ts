@@ -1,10 +1,11 @@
 import path from 'path';
 import { z } from 'zod';
 
-const base64Key = z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
+const REQUIRED = 'заавал бөглөнө';
+const base64Key = z.string({ error: `${REQUIRED} (openssl rand -base64 32)` }).refine((v) => Buffer.from(v, 'base64').length === 32, {
   message: 'base64-ээр кодолсон яг 32 байт түлхүүр байх ёстой (openssl rand -base64 32)',
 });
-const secret = z.string().min(32, 'хамгийн багадаа 32 тэмдэгт байх ёстой');
+const secret = z.string({ error: `${REQUIRED} (openssl rand -hex 32)` }).min(32, 'хамгийн багадаа 32 тэмдэгт байх ёстой');
 const csv = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 const schema = z.object({
@@ -42,12 +43,18 @@ const schema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().default(30),
 });
 
-const parsed = schema.safeParse(process.env);
-if (!parsed.success) {
-  const lines = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
-  throw new Error(`Орчны хувьсагчийн тохиргоо буруу байна (.env.example-г харна уу):\n${lines}`);
+// .env дэх `KEY=` мөр нь "тохируулаагүй" гэсэн утгатай: анхны утга нь хэрэглэгдэж, сонголттой
+// талбарын шалгалтад унахгүй.
+export function parseEnv(raw: Record<string, string | undefined>) {
+  const given = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined && v.trim() !== ''));
+  const parsed = schema.safeParse(given);
+  if (!parsed.success) {
+    const lines = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
+    throw new Error(`Орчны хувьсагчийн тохиргоо буруу байна (.env.example-г харна уу):\n${lines}`);
+  }
+  return parsed.data;
 }
-const e = parsed.data;
+const e = parseEnv(process.env);
 
 export const env = {
   ...e,
