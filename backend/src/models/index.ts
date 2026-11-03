@@ -70,6 +70,7 @@ const movieSchema = new Schema({
   hlsPath: { type: String, select: false },
   videoStatus: { type: String, enum: ['none', 'uploading', 'queued', 'processing', 'ready', 'failed'], default: 'none' },
   videoError: String,
+  videoProgress: { type: Number, min: 0, max: 100 },
   duration: { type: Number, min: 0 },
   releaseYear: { type: Number, min: 1888, max: 2100 },
   genres: [ref('Category')],

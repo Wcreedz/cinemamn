@@ -11,6 +11,8 @@ import { VideoConfigurationService } from './videoConfiguration.service';
 const run = promisify(execFile);
 const MAX_ATTEMPTS = 3;
 const STALE_LOCK_MS = 6 * 60 * 60 * 1000;
+// -progress хэдэн секунд тутам мөр бичдэг: урт киног боловсруулж байхад хязгаар хэтэрч FFmpeg зогсохгүй.
+const PROGRESS_MAX_BUFFER = 100 * 1024 * 1024;
 const TOOLS_MISSING = 'FFmpeg сервер дээр олдсонгүй. "apt install -y ffmpeg" суулгаад дахин оролдоно уу.';
 const DISK_ERRORS = new Set(['ENOSPC', 'EACCES', 'EPERM', 'EROFS']);
 
@@ -47,24 +49,30 @@ export function planLadder(sourceHeight: number, configured: number[]) {
   return ladder.length ? ladder : [sourceHeight - (sourceHeight % 2)];
 }
 
-export async function transcode(source: string, outDir: string, cfg: VideoSettings['ffmpeg'], resolutions: number[], ffmpeg = env.FFMPEG_PATH, ffprobe = env.FFPROBE_PATH) {
+export async function transcode(source: string, outDir: string, cfg: VideoSettings['ffmpeg'], resolutions: number[], ffmpeg = env.FFMPEG_PATH, ffprobe = env.FFPROBE_PATH, onProgress?: (fraction: number) => void) {
   const info = await probe(source, ffprobe);
   const ladder = planLadder(info.height, resolutions);
   const variants: string[] = [];
-  for (const height of ladder) {
+  for (const [done, height] of ladder.entries()) {
     const dir = path.join(outDir, `${height}p`);
     await fs.mkdir(dir, { recursive: true });
     const kbps = BITRATES[height] ?? Math.round(height * 5);
     const width = Math.round((info.width * height) / info.height / 2) * 2;
-    await run(ffmpeg, [
-      '-y', '-i', source, '-map', '0:v:0', '-map', '0:a:0?',
+    const encoding = run(ffmpeg, [
+      '-y', '-nostats', '-progress', 'pipe:1', '-i', source, '-map', '0:v:0', '-map', '0:a:0?',
       '-vf', `scale=${width}:${height}`, '-c:v', 'libx264', '-preset', cfg.preset, '-crf', String(cfg.crf),
       '-maxrate', `${kbps}k`, '-bufsize', `${kbps * 2}k`, '-pix_fmt', 'yuv420p', '-threads', String(cfg.threads),
       '-force_key_frames', `expr:gte(t,n_forced*${cfg.segmentSeconds})`,
       '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
       '-f', 'hls', '-hls_time', String(cfg.segmentSeconds), '-hls_playlist_type', 'vod',
       '-hls_segment_filename', path.join(dir, 'seg_%05d.ts'), path.join(dir, 'index.m3u8'),
-    ], { maxBuffer: 10 * 1024 * 1024 });
+    ], { maxBuffer: PROGRESS_MAX_BUFFER });
+    // ffmpeg-ийн out_time_ms нь нэрнээс үл хамааран микросекунд байдаг.
+    encoding.child.stdout?.on('data', (chunk) => {
+      const last = [...String(chunk).matchAll(/out_time_ms=(\d+)/g)].pop();
+      if (last && info.duration > 0) onProgress?.((done + Math.min(1, Number(last[1]) / 1e6 / info.duration)) / ladder.length);
+    });
+    await encoding;
     variants.push(`#EXT-X-STREAM-INF:BANDWIDTH=${(kbps + 128) * 1000},RESOLUTION=${width}x${height}\n${height}p/index.m3u8`);
   }
   await fs.writeFile(path.join(outDir, 'master.m3u8'), `#EXTM3U\n#EXT-X-VERSION:3\n${variants.join('\n')}\n`);
@@ -135,11 +143,22 @@ export const VideoService = {
     const dirs = VideoConfigurationService.dirs(settings.storageRoot);
     const movieId = String(job.movieId);
     const work = path.join(dirs.temp, `job-${job._id}`);
-    await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'processing' } });
+    await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'processing', videoProgress: 0 } });
+    let reported = 0;
+    // Явц бичих бүрт түгжээг сунгана: ажиллаж байгаа урт киног requeueStale давхар эхлүүлэхгүй.
+    const onProgress = (fraction: number) => {
+      const percent = Math.floor(fraction * 100);
+      if (percent <= reported) return;
+      reported = percent;
+      void Promise.all([
+        Movie.updateOne({ _id: movieId, videoStatus: 'processing' }, { $set: { videoProgress: percent } }),
+        VideoJob.updateOne({ _id: job._id }, { $set: { lockedAt: new Date() } }),
+      ]).catch((err) => console.error('[video] явц бичиж чадсангүй:', (err as Error).message));
+    };
     try {
       await fs.rm(work, { recursive: true, force: true });
       await fs.mkdir(work, { recursive: true });
-      const { info } = await transcode(job.sourcePath, work, settings.ffmpeg, settings.hlsResolutions);
+      const { info } = await transcode(job.sourcePath, work, settings.ffmpeg, settings.hlsResolutions, undefined, undefined, onProgress);
       await verifyHls(work);
       await fs.mkdir(dirs.hls, { recursive: true });
       await fs.mkdir(dirs.originals, { recursive: true });
@@ -150,7 +169,7 @@ export const VideoService = {
       await fs.rename(job.sourcePath, original);
       await Movie.updateOne({ _id: movieId }, {
         $set: { videoStatus: 'ready', hlsPath: `hls/${movieId}`, videoSource: original, duration: Math.round(info.duration) },
-        $unset: { videoError: 1 },
+        $unset: { videoError: 1, videoProgress: 1 },
       });
       await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'ready', sourcePath: original, finishedAt: new Date() }, $unset: { error: 1 } });
     } catch (err) {
@@ -160,7 +179,7 @@ export const VideoService = {
       console.error(`[video] боловсруулалт амжилтгүй ${movieId}:`, error.message.slice(0, 1000));
       await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);
       if (!retryable) await fs.rm(job.sourcePath, { force: true }).catch(() => undefined);
-      await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'failed', videoError: message } });
+      await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'failed', videoError: message }, $unset: { videoProgress: 1 } });
       await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'failed', error: message, retryable, finishedAt: new Date() } });
     }
   },

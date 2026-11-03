@@ -101,10 +101,16 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     const up = await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
     expect(up.status).toBe(202);
 
-    await VideoService.process((await VideoService.claimNext())!);
+    const job = (await VideoService.claimNext())!;
+    // Удаан боловсруулж буй ажил явц бичих бүрт түгжээгээ сунгаж, давхар эхлэхгүй.
+    const oldLock = new Date(Date.now() - 86_400_000);
+    await VideoJob.updateOne({ _id: job._id }, { $set: { lockedAt: oldLock } });
+    await VideoService.process(job);
+    expect((await VideoJob.findById(job._id).lean())!.lockedAt!.getTime()).toBeGreaterThan(oldLock.getTime());
 
     const after = await Movie.findById(movie._id).select('+videoSource +hlsPath').lean();
     expect(after!.videoStatus).toBe('ready');
+    expect(after!.videoProgress).toBeUndefined();
     expect(Math.round(after!.duration!)).toBe(4);
     expect(after!.hlsPath).toBe(`hls/${movie._id}`);
     expect((await VideoJob.findById(up.body.jobId).lean())!.status).toBe('ready');

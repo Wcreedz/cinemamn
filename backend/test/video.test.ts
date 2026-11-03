@@ -40,8 +40,14 @@ describe('Видео боловсруулалт (жинхэнэ FFmpeg)', () => 
   it('HLS үүсгэж, 720p-ээс дээш чанар үүсгэхгүй, манифест баталгаажна', async () => {
     const out = path.join(dir, 'out');
     await fs.mkdir(out);
-    const { ladder } = await transcode(source, out, cfg, [1080, 720, 480], ffmpeg, ffprobe);
+    const progress: number[] = [];
+    const { ladder } = await transcode(source, out, cfg, [1080, 720, 480], ffmpeg, ffprobe, (f) => progress.push(f));
     expect(ladder).toEqual([720, 480]);
+    // Нийт явц: бүх чанарыг хамарч, 0-1 хооронд өснө.
+    expect(progress.length).toBeGreaterThan(1);
+    expect(progress.every((f) => f >= 0 && f <= 1)).toBe(true);
+    expect(progress[progress.length - 1]).toBeGreaterThan(0.9);
+    expect(progress.some((f) => f > 0.5)).toBe(true);
     await verifyHls(out);
     const master = await fs.readFile(path.join(out, 'master.m3u8'), 'utf8');
     expect(master).toContain('720p/index.m3u8');
