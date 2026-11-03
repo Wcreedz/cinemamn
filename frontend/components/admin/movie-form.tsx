@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { useApi } from '@/hooks/use-api';
 import { api, ApiClientError } from '@/lib/api';
 
-const VIDEO_LABELS: Record<string, string> = { none: 'Видеогүй', uploading: 'Байршуулж байна', queued: 'Дараалалд', processing: 'Боловсруулж байна', ready: 'Бэлэн', failed: 'Алдаатай' };
+const VIDEO_LABELS: Record<string, string> = { none: 'Видеогүй', uploading: 'Оруулж байна', queued: 'Дараалалд', processing: 'Боловсруулж байна', ready: 'Бэлэн', failed: 'Алдаатай' };
 // Vercel-ээр дамжих зам тасалдаж болно: нэг хэсэг бүтэлгүйтвэл хүлээгээд давтана.
 const CHUNK_SENDERS = 4;
 const CHUNK_ATTEMPTS = 8;
@@ -33,17 +33,17 @@ export function VideoBadge({ movie }: { movie: Pick<AdminMovie, 'videoStatus' | 
   const { videoStatus: status, videoProgress: percent, videoUpload: upload } = movie;
   if (upload) {
     return (
-      <Badge tone={upload.stalled ? 'warning' : 'primary'} className="gap-1 whitespace-nowrap">
+      <Badge tone={upload.stalled ? 'danger' : 'primary'} className="gap-1 whitespace-nowrap">
         {!upload.stalled && <Loader2 className="size-3 animate-spin" aria-hidden />}
-        {upload.stalled ? 'Байршуулалт зогссон' : 'Байршуулж байна'} {upload.percent}%
+        {upload.stalled ? 'Оруулалт зогссон' : 'Оруулж байна'} {upload.percent}%
       </Badge>
     );
   }
   const working = status === 'uploading' || status === 'queued' || status === 'processing';
   return (
-    <Badge tone={status === 'ready' ? 'success' : status === 'failed' ? 'danger' : working ? 'primary' : 'neutral'} className="gap-1 whitespace-nowrap">
+    <Badge tone={status === 'ready' ? 'success' : status === 'failed' ? 'danger' : working ? 'warning' : 'neutral'} className="gap-1 whitespace-nowrap">
       {working && <Loader2 className="size-3 animate-spin" aria-hidden />}
-      {VIDEO_LABELS[status] ?? status}{status === 'processing' && percent ? ` ${percent}%` : ''}
+      {VIDEO_LABELS[status] ?? status}{status === 'processing' ? ` ${percent ?? 0}%` : ''}
     </Badge>
   );
 }
