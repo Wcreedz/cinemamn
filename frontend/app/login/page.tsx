@@ -9,14 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
+import { authHref, safeNext } from '@/lib/auth-entry';
 import { PasswordInput } from '@/components/ui/password-input';
 import { RememberMe } from '@/components/ui/remember-me';
 import { useRememberedLogin } from '@/hooks/use-remembered-login';
 
 function LoginForm() {
   const router = useRouter();
-  const nextParam = useSearchParams().get('next');
-  const next = nextParam?.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
+  const next = safeNext(useSearchParams().get('next'));
   const { setUser } = useApp();
   const { login: phone, setLogin: setPhone, remember, setRemember, saveLogin } = useRememberedLogin('mf_login_phone');
   const [password, setPassword] = useState('');
@@ -29,7 +29,7 @@ function LoginForm() {
       const r = await api<{ user: PublicUser }>('/api/auth/login', { body: { phone, password } });
       saveLogin();
       setUser(r.user);
-      router.push(next);
+      router.push(next ?? '/');
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -42,7 +42,7 @@ function LoginForm() {
       <RememberMe checked={remember} onChange={setRemember} />
       {error && <Notice tone="danger">{error}</Notice>}
       <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Нэвтэрч байна…' : 'Нэвтрэх'}</Button>
-      <p className="text-sm text-muted-foreground">Бүртгэлгүй юу? <Link href="/register" className="text-primary hover:underline">Бүртгүүлэх</Link></p>
+      <p className="text-sm text-muted-foreground">Бүртгэлгүй юу? <Link href={authHref('/register', next)} className="text-primary hover:underline">Бүртгүүлэх</Link></p>
       <p className="text-sm"><Link href="/forgot-password" className="text-muted-foreground hover:underline">Нууц үг солих</Link></p>
     </form>
   );

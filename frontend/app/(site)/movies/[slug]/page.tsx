@@ -9,6 +9,7 @@ import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
+import { authEntry } from '@/lib/auth-entry';
 import { money, runtime } from '@/lib/utils';
 
 export default function MovieDetailPage() {
@@ -43,7 +44,7 @@ export default function MovieDetailPage() {
             {canWatch ? (
               <Button asChild size="lg" disabled={m.videoStatus !== 'ready'}><Link href={`/watch/${m.slug}`}><Play />Кино үзэх</Link></Button>
             ) : (
-              <Button asChild size="lg"><Link href={user ? '/subscription' : `/login?next=/movies/${m.slug}`}><Crown />{user ? 'Эрх авах' : 'Нэвтэрч үзэх'}</Link></Button>
+              <Button asChild size="lg"><Link href={user ? '/subscription' : authEntry(`/movies/${m.slug}`)}><Crown />{user ? 'Эрх авах' : 'Нэвтэрч үзэх'}</Link></Button>
             )}
             {m.trailerUrl && <Button asChild size="lg" variant="secondary"><a href={m.trailerUrl} target="_blank" rel="noreferrer noopener"><Youtube />Трейлер</a></Button>}
           </div>

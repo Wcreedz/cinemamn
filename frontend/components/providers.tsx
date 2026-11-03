@@ -3,6 +3,7 @@ import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicSettings, PublicUser, SubscriptionMe } from '@mongolflix/shared';
 import { api, isAdminPath, refreshSession, setSiteActsAsAdmin } from '@/lib/api';
+import { markHasAccount } from '@/lib/auth-entry';
 
 interface AppState {
   user: PublicUser | null;
@@ -64,6 +65,9 @@ export function Providers({ children }: { children: ReactNode }) {
 
   useEffect(() => { void refreshUser(); }, [refreshUser]);
   useEffect(() => { api<PublicSettings>('/api/settings/public').then(setSettings).catch(() => setSettings(null)); }, []);
+
+  // Бүртгүүлсэн, нэвтэрсэн, сесс нь хүчинтэй хэвээр байгаа бүх тохиолдол энд нэг дор тэмдэглэгдэнэ.
+  useEffect(() => { if (user) markHasAccount(); }, [user]);
 
   useEffect(() => {
     if (!user) { setAccess(null); return; }
