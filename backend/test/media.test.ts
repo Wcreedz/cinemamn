@@ -101,6 +101,26 @@ describe('Зураг: солих, устгах, ангилал, нүүр хуу�
     expect(await exists(third)).toBe(false);
   });
 
+  it('ангилал: slug нэрээс автоматаар, давхцвал дугаартай, шинэ нь сүүлд жагсана', async () => {
+    await Category.create({ name: 'Драм', slug: 'drama', sortOrder: 5 });
+    const { agent } = await login('admin');
+    const first = await agent.post('/api/admin/categories').send({ name: 'Монгол кино' });
+    const second = await agent.post('/api/admin/categories').send({ name: 'Монгол кино' });
+    expect([first.status, second.status]).toEqual([201, 201]);
+    const a = (await Category.findById(first.body.id).lean())!;
+    const b = (await Category.findById(second.body.id).lean())!;
+    expect([a.slug, b.slug]).toEqual(['mongol-kino', 'mongol-kino-2']);
+    expect([a.sortOrder, b.sortOrder]).toEqual([6, 7]);
+  });
+
+  it('ангилал засахад slug, дараалал хэвээр: холбоос, нүүрний хэсэг эвдрэхгүй', async () => {
+    const c = await Category.create({ name: 'Драм', slug: 'drama', sortOrder: 5 });
+    const { agent } = await login('admin');
+    expect((await agent.put(`/api/admin/categories/${c._id}`).send({ name: 'Шинэ нэр', isActive: true })).status).toBe(200);
+    const after = (await Category.findById(c._id).lean())!;
+    expect([after.name, after.slug, after.sortOrder]).toEqual(['Шинэ нэр', 'drama', 5]);
+  });
+
   it('эрхгүй хүн зураг байршуулж чадахгүй', async () => {
     const c = await Category.create({ name: 'Драм', slug: 'drama' });
     const viewer = await login();

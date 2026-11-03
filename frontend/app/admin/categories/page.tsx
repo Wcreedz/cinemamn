@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { Category } from '@mongolflix/shared';
 import { ImageField, uploadImageFile } from '@/components/admin/image-field';
-import { Field, NumberInput, PageHeader, Panel, Table } from '@/components/admin/ui';
+import { Field, PageHeader, Panel, Table } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { Confirm } from '@/components/ui/confirm';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { useApi } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 
 const IMAGE_MAX_SIDE = 800;
-const empty = { name: '', slug: '', image: '', sortOrder: 0, isActive: true };
+const empty = { name: '', image: '', isActive: true };
 
 export default function AdminCategories() {
   const { data, error, reload } = useApi<{ items: Category[] }>('/api/admin/categories');
@@ -51,10 +51,8 @@ export default function AdminCategories() {
         <form onSubmit={(e) => void save(e)} className="grid gap-4 md:grid-cols-[16rem_1fr]">
           <ImageField label="Зураг" hint="Заавал биш. Хамгийн тохиромжтой нь 600×340." src={f.image} file={file} disabled={busy} previewClass="h-28 w-full" onPick={setFile} onRemove={() => { setFile(null); setF({ ...f, image: '' }); }} />
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-[1fr_1fr_6rem_auto] sm:items-end">
+            <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
               <Field label="Нэр"><Input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-              <Field label="Slug"><Input required pattern="[a-z0-9]+(-[a-z0-9]+)*" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} /></Field>
-              <Field label="Дараалал"><NumberInput value={f.sortOrder} onChange={(v) => setF({ ...f, sortOrder: v })} /></Field>
               <label className="flex h-10 items-center gap-2 text-sm">Идэвхтэй<Switch checked={f.isActive} onCheckedChange={(v) => setF({ ...f, isActive: v })} /></label>
             </div>
             {msg && <Notice tone="danger">{msg}</Notice>}
@@ -65,13 +63,13 @@ export default function AdminCategories() {
           </div>
         </form>
       </Panel>
-      <Table head={['Зураг', 'Нэр', 'Slug', 'Дараалал', 'Идэвхтэй', '']}>
+      <Table head={['Зураг', 'Нэр', 'Идэвхтэй', '']}>
         {data.items.map((c) => (
           <tr key={c.id}>
             <td className="px-4 py-3">{c.image ? <img src={c.image} alt="" className="h-10 w-16 rounded object-cover" /> : <span className="text-muted-foreground">Зураггүй</span>}</td>
-            <td className="px-4 py-3 font-semibold">{c.name}</td><td className="px-4 py-3">{c.slug}</td><td className="px-4 py-3">{c.sortOrder}</td><td className="px-4 py-3">{c.isActive ? 'Тийм' : 'Үгүй'}</td>
+            <td className="px-4 py-3 font-semibold">{c.name}</td><td className="px-4 py-3">{c.isActive ? 'Тийм' : 'Үгүй'}</td>
             <td className="space-x-2 px-4 py-3 text-right">
-              <Button size="sm" variant="outline" onClick={() => { setEditing(c.id); setFile(null); setMsg(null); setF({ name: c.name, slug: c.slug, image: c.image ?? '', sortOrder: c.sortOrder, isActive: c.isActive }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Засах</Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditing(c.id); setFile(null); setMsg(null); setF({ name: c.name, image: c.image ?? '', isActive: c.isActive }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Засах</Button>
               <Confirm question={`"${c.name}" ангиллыг устгах уу?`} onConfirm={() => void del(c)}>
                 <Button size="sm" variant="ghost" aria-label={`${c.name} устгах`}>Устгах</Button>
               </Confirm>

@@ -26,6 +26,7 @@ api.post('/auth/reset-password', authLimiter, auth.resetPassword);
 api.post('/auth/admin/login', authLimiter, auth.adminLogin);
 api.post('/auth/refresh', authLimiter, auth.refresh);
 api.post('/auth/logout', optionalAuth, auth.logout);
+api.get('/auth/session', auth.session);
 api.get('/auth/me', requireAuth, auth.me);
 api.patch('/auth/me', requireAuth, auth.updateProfile);
 api.post('/auth/change-password', authLimiter, requireAuth, auth.changePassword);

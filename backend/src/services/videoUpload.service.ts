@@ -10,6 +10,8 @@ import { VideoConfigurationService } from './videoConfiguration.service';
 export const CHUNK_BYTES = 3 * 1024 * 1024;
 const VIDEO_EXTS = new Set(['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v']);
 const ABANDONED_MS = 7 * 24 * 60 * 60 * 1000;
+// Клиент тасалдсан хэсгийг ~1.5 минут давтдаг: үүнээс удаан чимээгүй бол зогссон гэж харуулна.
+const STALLED_MS = 3 * 60 * 1000;
 const GB = 1024 ** 3;
 const DISK_FULL = 'Серверийн диск дүүрсэн байна. Зай чөлөөлөөд дахин оролдоно уу.';
 
@@ -104,6 +106,15 @@ export const VideoUploadService = {
       await VideoUpload.updateOne({ _id: uploadId }, { $set: { status: 'uploading' } });
       throw err;
     }
+  },
+
+  // Кино байршуулагдаж дуустал Movie-д тэмдэглэгдэхгүй: жагсаалт явцыг эндээс уншина.
+  async progressFor(movieIds: unknown[], now = Date.now()) {
+    const uploads = await VideoUpload.find({ movieId: { $in: movieIds }, status: 'uploading' }).select('movieId size received updatedAt').sort({ updatedAt: 1 }).lean();
+    return new Map(uploads.map((u) => [String(u.movieId), {
+      percent: Math.floor((u.received.length / chunkCount(u.size)) * 100),
+      stalled: now - (u.updatedAt?.getTime() ?? 0) > STALLED_MS,
+    }]));
   },
 
   discardForMovie: (movieId: string) => discard({ movieId }),

@@ -161,11 +161,11 @@ describe('Нэвтрэлт', () => {
 
   it('"Намайг сана" сонгоогүй бол refresh cookie нь сешн хугацаатай, rotation-д ч хэвээр', async () => {
     const { email, password } = await login('admin');
-    const refreshCookie = (r: request.Response) => ([] as string[]).concat(r.headers['set-cookie']).find((c) => c.startsWith('mf_refresh='))!;
+    const refreshCookie = (r: request.Response) => ([] as string[]).concat(r.headers['set-cookie']).find((c) => c.startsWith('mf_admin_refresh='))!;
     const agent = request.agent(app);
     const short = await agent.post('/api/auth/admin/login').send({ email, password, remember: false });
     expect(refreshCookie(short)).not.toMatch(/Expires=/i);
-    expect(refreshCookie(await agent.post('/api/auth/refresh'))).not.toMatch(/Expires=/i);
+    expect(refreshCookie(await agent.post('/api/auth/refresh').set('X-Auth-Scope', 'admin'))).not.toMatch(/Expires=/i);
     const long = await api().post('/api/auth/admin/login').send({ email, password, remember: true });
     expect(refreshCookie(long)).toMatch(/Expires=/i);
   });

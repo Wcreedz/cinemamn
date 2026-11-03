@@ -24,7 +24,7 @@ export interface MovieDetail extends MovieSummary {
   originalTitle?: string; trailerUrl?: string; cast: string[]; director?: string; language?: string; country?: string;
   videoStatus: VideoStatus;
 }
-export interface AdminMovie extends MovieDetail { isPublished: boolean; videoError?: string; videoProgress?: number; videoUploadSeconds?: number; videoProcessSeconds?: number; videoRetryable?: boolean; videoPlayable: boolean; createdAt: string; updatedAt: string }
+export interface AdminMovie extends MovieDetail { isPublished: boolean; videoError?: string; videoProgress?: number; videoUploadSeconds?: number; videoProcessSeconds?: number; videoRetryable?: boolean; videoPlayable: boolean; videoUpload?: { percent: number; stalled: boolean }; createdAt: string; updatedAt: string }
 
 export interface Plan { code: string; name: string; price: number; currency: string; durationDays: number; enabled: boolean }
 export interface PlansResponse { enabled: boolean; paymentRequired: boolean; currency: string; plans: Plan[]; version: number }

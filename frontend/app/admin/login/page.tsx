@@ -53,7 +53,6 @@ export default function AdminLoginPage() {
             <PasswordInput id="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <RememberMe checked={remember} onChange={setRemember} />
-          {user?.role === 'user' && !error && <Notice tone="warning">Таны одоогийн бүртгэл админ эрхгүй байна. Админ имэйлээрээ нэвтэрнэ үү.</Notice>}
           {error && <Notice tone="danger">{error}</Notice>}
           <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Нэвтэрч байна…' : 'Нэвтрэх'}</Button>
         </form>

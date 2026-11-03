@@ -128,6 +128,33 @@ describe('Видео хэсэгчлэн байршуулах', () => {
     expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('ready');
   });
 
+  it('жагсаалт байршуулалтын явцыг харуулж, дуусмагц алга болно', async () => {
+    const { movie, agent, start, send, complete } = await begin();
+    const listed = async () => (await agent.get('/api/admin/movies')).body.items.find((m: { id: string }) => m.id === String(movie._id));
+    expect((await listed()).videoUpload).toEqual({ percent: 0, stalled: false });
+    await send(0, bytes(CHUNK, 1));
+    expect((await listed()).videoUpload).toEqual({ percent: 33, stalled: false });
+    expect((await agent.get(`/api/admin/movies/${movie._id}`)).body.videoUpload.percent).toBe(33);
+
+    await VideoUpload.collection.updateOne({ _id: new Types.ObjectId(start.uploadId) }, { $set: { updatedAt: new Date(Date.now() - 10 * 60_000) } });
+    expect((await listed()).videoUpload).toEqual({ percent: 33, stalled: true });
+
+    await send(1, bytes(CHUNK, 2));
+    expect((await listed()).videoUpload).toEqual({ percent: 66, stalled: false });
+    await send(2, bytes(100, 3));
+    expect((await complete()).status).toBe(202);
+    const after = await listed();
+    expect(after.videoUpload).toBeUndefined();
+    expect(after.videoStatus).toBe('queued');
+  });
+
+  it('файлтай кинонд үлдэгдэл байршуулалт харагдахгүй', async () => {
+    const movie = await makeMovie({ videoStatus: 'ready', hlsPath: 'hls/x' });
+    const { agent } = await login('admin');
+    await agent.post(`/api/admin/movies/${movie._id}/upload/start`).send(FILE);
+    expect((await agent.get('/api/admin/movies')).body.items[0].videoUpload).toBeUndefined();
+  });
+
   it('эрхгүй бол хэсэг хүлээж авахгүй', async () => {
     const { url } = await begin();
     expect((await api().put(`${url}/chunks/0`).set('Content-Type', 'application/octet-stream').send(bytes(100, 1))).status).toBe(401);

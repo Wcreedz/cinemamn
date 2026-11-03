@@ -23,8 +23,22 @@ const MAX_BACKOFF_MS = 30_000;
 // Хуучин хувилбар хадгалсан англи бичиг: хэмжээний хязгаар одоо байхгүй.
 export const videoErrorText = (error: string) => (error === 'File too large' ? 'Өмнөх байршуулалт хэмжээний хязгаарт баригдсан. Одоо хязгааргүй тул файлаа дахин оруулна уу.' : error);
 
-export function VideoBadge({ movie }: { movie: Pick<AdminMovie, 'videoStatus' | 'videoProgress'> }) {
-  const { videoStatus: status, videoProgress: percent } = movie;
+// Зогссон байршуулалт хадгалагдсан хэвээр: ижил файлыг сонговол тэндээсээ үргэлжилнэ.
+export const UploadStalledNote = ({ movie }: { movie: Pick<AdminMovie, 'videoUpload'> }) => (movie.videoUpload?.stalled
+  ? <p className="mt-1 max-w-xs text-xs text-muted-foreground">Цонх хаагдсан эсвэл холболт тасарсан байна. &quot;Засах&quot; дээр ижил файлаа сонговол тасарсан газраасаа үргэлжилнэ.</p>
+  : null);
+export const isWorking = (movie: Pick<AdminMovie, 'videoStatus' | 'videoUpload'>) => movie.videoStatus === 'queued' || movie.videoStatus === 'processing' || !!movie.videoUpload;
+
+export function VideoBadge({ movie }: { movie: Pick<AdminMovie, 'videoStatus' | 'videoProgress' | 'videoUpload'> }) {
+  const { videoStatus: status, videoProgress: percent, videoUpload: upload } = movie;
+  if (upload) {
+    return (
+      <Badge tone={upload.stalled ? 'warning' : 'primary'} className="gap-1 whitespace-nowrap">
+        {!upload.stalled && <Loader2 className="size-3 animate-spin" aria-hidden />}
+        {upload.stalled ? 'Байршуулалт зогссон' : 'Байршуулж байна'} {upload.percent}%
+      </Badge>
+    );
+  }
   const working = status === 'uploading' || status === 'queued' || status === 'processing';
   return (
     <Badge tone={status === 'ready' ? 'success' : status === 'failed' ? 'danger' : working ? 'primary' : 'neutral'} className="gap-1 whitespace-nowrap">
@@ -172,7 +186,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     let failed = false;
     const hooks: RetryHooks = {
       stopped: () => failed,
-      onRetry: (attempt) => setTask((t) => t && { ...t, warning: `Холболт тасарлаа. Дахин оролдож байна (${attempt}/${CHUNK_ATTEMPTS - 1})…` }),
+      onRetry: (attempt) => setTask((t) => t && { ...t, warning: `Сервер түр хариу өгсөнгүй. Автоматаар дахин оролдож байна (${attempt}/${CHUNK_ATTEMPTS - 1}), хуудсаа хаах хэрэггүй.` }),
     };
     const sender = async () => {
       for (let index = queue.shift(); index !== undefined && !failed; index = queue.shift()) {
@@ -279,6 +293,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
               ? <Badge tone={movie.isPublished ? 'success' : 'neutral'} className="whitespace-nowrap">{movie.isPublished ? 'Нийтлэгдсэн' : 'Нийтлэгдээгүй'}</Badge>
               : <VideoBadge movie={movie} />)}
           </div>
+          {movie && <UploadStalledNote movie={movie} />}
           {movie && <VideoTimes movie={movie} />}
           {hasVideo ? <p className="text-xs text-muted-foreground">Кино файл орсон байна. Өөр файл оруулах бол киног жагсаалтаас устгаад шинээр бүртгэнэ үү.</p> : (
             <>

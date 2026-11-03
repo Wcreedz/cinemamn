@@ -1,7 +1,7 @@
 # Аюулгүй байдал
 
 - **Нууц үг**: argon2id. **Refresh token**: зөвхөн SHA-256 hash, rotation, давтан ашиглалт илэрвэл гэр бүлээр нь цуцална.
-- **Cookie**: HttpOnly, SameSite=Lax, production дээр Secure. **CSRF**: SameSite + Origin allowlist.
+- **Cookie**: HttpOnly, SameSite=Lax, production дээр Secure. Хэрэглэгч `mf_access`/`mf_refresh`, админ `mf_admin_access`/`mf_admin_refresh`: нэг хөтчид зэрэг ажиллана, `/api/admin` зөвхөн админ cookie-г уншина. `X-Auth-Scope: admin` толгой аль cookie-г унших л заана, эрх өгөхгүй. **CSRF**: SameSite + Origin allowlist.
 - **Нэвтрэлт**: хэрэглэгч зөвхөн утсаар (`/login`), админ зөвхөн имэйлээр (`/admin/login`). Эрхийн ангилал хайлтын нөхцөлд орсон тул нөгөө замаар нэвтрэхгүй.
 - **Эрх**: `requireAdmin` бүх `/api/admin`-д, хэрэглэгчийг хүсэлт бүрт баазаас уншина. Заавал биш IP allowlist.
 - **Оролт**: Zod бүх endpoint-д, `$`/`.` түлхүүр хасна, regex-ийг escape хийнэ. **Файл**: зурагт magic byte, видеонд MIME/өргөтгөл + ffprobe.

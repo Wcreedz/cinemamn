@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import os from 'os';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -70,6 +71,8 @@ export async function transcode(source: string, outDir: string, cfg: VideoSettin
       '-f', 'hls', '-hls_time', String(cfg.segmentSeconds), '-hls_playlist_type', 'vod',
       '-hls_segment_filename', path.join(dir, 'seg_%05d.ts'), path.join(dir, 'index.m3u8'),
     ], { maxBuffer: PROGRESS_MAX_BUFFER, signal });
+    // Бүх цөмийг эзэлж API, байршуулалтыг хоцроохгүй. Амжсангүй бол ч кино боловсруулагдах ёстой.
+    try { if (encoding.child.pid) os.setPriority(encoding.child.pid, os.constants.priority.PRIORITY_LOW); } catch { /* процесс дууссан эсвэл эрхгүй */ }
     // ffmpeg-ийн out_time_ms нь нэрнээс үл хамааран микросекунд байдаг.
     encoding.child.stdout?.on('data', (chunk) => {
       const last = [...String(chunk).matchAll(/out_time_ms=(\d+)/g)].pop();

@@ -148,6 +148,12 @@ export async function setAdminRole(req: Request, res: Response) {
 // ---------- Кино ----------
 const adminMovie = (m: any) => ({ ...movieDetail(m), videoPlayable: !!m.hlsPath, isPublished: m.isPublished, videoError: m.videoError, videoProgress: m.videoProgress, videoUploadSeconds: m.videoUploadSeconds, videoProcessSeconds: m.videoProcessSeconds, createdAt: m.createdAt, updatedAt: m.updatedAt });
 
+// Файлтай кинонд хуучин нээлттэй цонхны үлдэгдэл байршуулалт нөлөөлөхгүй.
+async function withUploadProgress(movies: any[]) {
+  const progress = await VideoUploadService.progressFor(movies.filter((m) => !m.hlsPath && (m.videoStatus === 'none' || m.videoStatus === 'failed')).map((m) => m._id));
+  return movies.map((m) => ({ ...adminMovie(m), videoUpload: progress.get(String(m._id)) }));
+}
+
 export async function listMovies(req: Request, res: Response) {
   const q = parse(pageQuery.extend({ q: z.string().trim().max(100).optional(), published: z.enum(['true', 'false']).optional() }), req.query);
   const filter: Record<string, unknown> = {};
@@ -157,7 +163,7 @@ export async function listMovies(req: Request, res: Response) {
     Movie.find(filter).select('+hlsPath').populate('genres').sort(sortFrom(q.sort, ['createdAt', 'title', 'viewCount'], '-createdAt')).skip((q.page - 1) * q.limit).limit(q.limit).lean(),
     Movie.countDocuments(filter),
   ]);
-  res.json(paged(items.map(adminMovie), total, q.page, q.limit));
+  res.json(paged(await withUploadProgress(items), total, q.page, q.limit));
 }
 
 export async function getMovie(req: Request, res: Response) {
@@ -165,7 +171,7 @@ export async function getMovie(req: Request, res: Response) {
   const m = await Movie.findById(id).select('+hlsPath').populate('genres').lean();
   if (!m) throw notFound('Кино олдсонгүй.');
   const videoRetryable = !!(await VideoJob.exists({ movieId: id, status: 'failed', retryable: true }));
-  res.json({ ...adminMovie(m), videoRetryable });
+  res.json({ ...(await withUploadProgress([m]))[0], videoRetryable });
 }
 
 export async function videoTools(_req: Request, res: Response) {
@@ -181,12 +187,11 @@ export async function retryVideo(req: Request, res: Response) {
 }
 
 // Давхцлыг unique index шийднэ: урьдчилж шалгавал зэрэг нэмэхэд давхцаж болно.
-async function createWithUniqueSlug(input: z.infer<typeof movieInput>) {
-  if (input.slug) return Movie.create(input);
-  const base = toSlug(input.title);
+async function withUniqueSlug<T>(title: string, create: (slug: string) => Promise<T>) {
+  const base = toSlug(title);
   for (let n = 1; ; n++) {
     try {
-      return await Movie.create({ ...input, slug: n === 1 ? base : `${base}-${n}` });
+      return await create(n === 1 ? base : `${base}-${n}`);
     } catch (err) {
       const e = err as { code?: number; keyPattern?: Record<string, unknown> };
       if (e.code !== 11000 || !e.keyPattern?.slug) throw err;
@@ -195,7 +200,8 @@ async function createWithUniqueSlug(input: z.infer<typeof movieInput>) {
 }
 
 export async function createMovie(req: Request, res: Response) {
-  const m = await createWithUniqueSlug(withoutEmpty(parse(movieInput, req.body), ['poster', 'backdrop']).$set);
+  const input = withoutEmpty(parse(movieInput, req.body), ['poster', 'backdrop']).$set;
+  const m = await (input.slug ? Movie.create(input) : withUniqueSlug(input.title, (slug) => Movie.create({ ...input, slug })));
   await logAdmin(req, 'movie.create', { type: 'Movie', id: m._id }, { title: m.title });
   res.status(201).json(adminMovie((await Movie.findById(m._id).select('+hlsPath').populate('genres').lean())!));
 }
@@ -265,7 +271,10 @@ export async function listCategories(_req: Request, res: Response) {
   res.json({ items: (await Category.find().sort({ sortOrder: 1 }).lean()).map((c: any) => ({ id: String(c._id), name: c.name, slug: c.slug, description: c.description, image: c.image, sortOrder: c.sortOrder, isActive: c.isActive })) });
 }
 export async function createCategory(req: Request, res: Response) {
-  const c = await Category.create(withoutEmpty(parse(categoryInput, req.body), ['image']).$set);
+  const input = withoutEmpty(parse(categoryInput, req.body), ['image']).$set;
+  const last = await Category.findOne().sort({ sortOrder: -1 }).select('sortOrder').lean();
+  const sortOrder = input.sortOrder ?? (last?.sortOrder ?? 0) + 1;
+  const c = await (input.slug ? Category.create({ ...input, sortOrder }) : withUniqueSlug(input.name, (slug) => Category.create({ ...input, sortOrder, slug })));
   await logAdmin(req, 'category.create', { type: 'Category', id: c._id }, { name: c.name });
   res.status(201).json({ id: String(c._id) });
 }

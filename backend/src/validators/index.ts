@@ -37,10 +37,11 @@ export const movieInput = z.object({
 });
 export const categoryInput = z.object({
   name: z.string().trim().min(1).max(60),
-  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/).max(60),
+  // Маягтад байхгүй. Заагаагүй бол шинэ ангилалд нэрээс үүсэж, сүүлд жагсана. Засахад хуучин нь хэвээр: холбоос, нүүрний хэсэг эвдрэхгүй.
+  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/).max(60).optional(),
   description: z.string().max(500).optional(),
   image: z.string().trim().max(1000).optional(),
-  sortOrder: z.number().int().default(0),
+  sortOrder: z.number().int().optional(),
   isActive: z.boolean().default(true),
 });
 export const movieQuery = z.object({
