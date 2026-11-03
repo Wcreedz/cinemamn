@@ -16,7 +16,7 @@ export const defaults = (): SettingValues => ({
     plans: [{ code: 'MONTHLY', name: 'Сарын эрх', price: 14900, durationDays: 30, enabled: true }],
   },
   video: {
-    storageRoot: env.VIDEO_DEFAULT_ROOT, hlsResolutions: [1080, 720, 480], maxUploadSizeMb: 20480,
+    storageRoot: env.VIDEO_DEFAULT_ROOT, hlsResolutions: [1080, 720, 480],
     ffmpeg: { preset: 'veryfast', crf: 22, segmentSeconds: 6, threads: 0 },
     playbackTokenExpiryMinutes: 120,
   },

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import mongoose from 'mongoose';
 import { env } from '../config/env';
 import * as admin from '../controllers/admin.controller';
@@ -9,6 +9,7 @@ import * as settings from '../controllers/settings.controller';
 import * as stream from '../controllers/stream.controller';
 import * as subs from '../controllers/subscription.controller';
 import { optionalAuth, requireAdmin, requireAuth, requireSuperadmin } from '../middleware/auth';
+import { CHUNK_BYTES } from '../services/videoUpload.service';
 import { authLimiter } from '../middleware/security';
 
 export const api = Router();
@@ -76,7 +77,9 @@ a.post('/movies', admin.createMovie);
 a.get('/movies/:id', admin.getMovie);
 a.put('/movies/:id', admin.updateMovie);
 a.delete('/movies/:id', admin.deleteMovie);
-a.post('/movies/:id/upload', admin.uploadVideo);
+a.post('/movies/:id/upload/start', admin.startVideoUpload);
+a.put('/movies/:id/upload/:uploadId/chunks/:index', express.raw({ type: 'application/octet-stream', limit: CHUNK_BYTES }), admin.uploadVideoChunk);
+a.post('/movies/:id/upload/:uploadId/complete', admin.completeVideoUpload);
 a.post('/movies/:id/video/retry', admin.retryVideo);
 a.get('/video-tools', admin.videoTools);
 a.post('/movies/:id/image', admin.uploadImage);

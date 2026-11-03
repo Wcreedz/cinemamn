@@ -30,7 +30,9 @@ export function originCheck(req: Request, _res: Response, next: NextFunction) {
   throw forbidden('Энэ эх сурвалжаас хүсэлт илгээх боломжгүй.');
 }
 
-export const apiLimiter = rateLimit({ windowMs: 60_000, limit: env.RATE_LIMIT_MAX, standardHeaders: true, legacyHeaders: false, message: { error: { code: 'RATE_LIMITED', message: 'Хэт олон хүсэлт илгээлээ. Түр хүлээнэ үү.' } } });
+// Том киноны хэсгүүд минутанд олон ирнэ. Эрхийг requireAdmin шалгана.
+const VIDEO_CHUNK_PATH = /^\/admin\/movies\/[^/]+\/upload\/[^/]+\/chunks\//;
+export const apiLimiter = rateLimit({ windowMs: 60_000, limit: env.RATE_LIMIT_MAX, standardHeaders: true, legacyHeaders: false, skip: (req) => VIDEO_CHUNK_PATH.test(req.path), message: { error: { code: 'RATE_LIMITED', message: 'Хэт олон хүсэлт илгээлээ. Түр хүлээнэ үү.' } } });
 export const authLimiter = rateLimit({ windowMs: 10 * 60_000, limit: env.AUTH_RATE_LIMIT_MAX, standardHeaders: true, legacyHeaders: false, message: { error: { code: 'RATE_LIMITED', message: 'Хэт олон оролдлого хийлээ. Түр хүлээнэ үү.' } } });
 
 // Энэ middleware /api дээр холбогдсон тул req.path-д /api угтвар байхгүй.

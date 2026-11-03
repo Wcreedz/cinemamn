@@ -33,7 +33,6 @@ export const subscriptionSchema = z.object({
 export const videoSchema = z.object({
   storageRoot: z.string().trim().min(1),
   hlsResolutions: z.array(z.union([z.literal(2160), z.literal(1440), z.literal(1080), z.literal(720), z.literal(480), z.literal(360)])).min(1),
-  maxUploadSizeMb: z.number().int().min(1).max(200_000),
   ffmpeg: z.object({
     preset: z.enum(['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow']),
     crf: z.number().int().min(16).max(32),

@@ -226,3 +226,19 @@ const videoJobSchema = new Schema({
 }, opts('video_jobs'));
 videoJobSchema.index({ status: 1, createdAt: 1 });
 export const VideoJob = model('VideoJob', videoJobSchema);
+
+// ---------- VideoUpload (хэсэгчлэн байршуулж буй файл) ----------
+const videoUploadSchema = new Schema({
+  movieId: { ...ref('Movie'), required: true },
+  fileKey: { type: String, required: true },
+  fileName: { type: String, required: true },
+  size: { type: Number, required: true },
+  chunkSize: { type: Number, required: true },
+  tempPath: { type: String, required: true },
+  received: { type: [Number], default: [] },
+  status: { type: String, enum: ['uploading', 'completed'], default: 'uploading' },
+  jobId: ref('VideoJob'),
+}, opts('video_uploads'));
+videoUploadSchema.index({ movieId: 1, fileKey: 1 });
+videoUploadSchema.index({ updatedAt: 1 });
+export const VideoUpload = model('VideoUpload', videoUploadSchema);

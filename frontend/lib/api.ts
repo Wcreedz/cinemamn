@@ -10,7 +10,7 @@ export class ApiClientError extends Error {
   }
 }
 
-interface Options { method?: string; body?: unknown; form?: FormData; retry?: boolean }
+interface Options { method?: string; body?: unknown; form?: FormData; raw?: Blob; retry?: boolean }
 
 let refreshing: Promise<boolean> | null = null;
 const refresh = () => (refreshing ??= fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
@@ -21,9 +21,10 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   const res = await fetch(`${API_BASE}${path}`, {
     method: opts.method ?? (opts.body || opts.form ? 'POST' : 'GET'),
     credentials: 'include',
-    headers: opts.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
-  });
+    headers: opts.raw ? { 'Content-Type': 'application/octet-stream' } : opts.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: opts.raw ?? opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
+    // Хөтчийн "Failed to fetch" нь хэрэглэгчид юу ч хэлэхгүй.
+  }).catch(() => { throw new ApiClientError('Сервертэй холбогдож чадсангүй. Интернэт холболтоо шалгаад дахин оролдоно уу.', 0, 'NETWORK'); });
   if (res.status === 401 && opts.retry !== false && !path.startsWith('/api/auth/')) {
     if (await refresh()) return api<T>(path, { ...opts, retry: false });
   }
@@ -33,7 +34,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   if (!res.ok) {
     const err = (data as ApiError | null)?.error;
     // Зарим тохиргооны тест { ok, message } хэлбэрээр алдаа буцаадаг.
-    const message = err?.message ?? (data as { message?: string } | null)?.message ?? 'Сервертэй холбогдоход алдаа гарлаа.';
+    const message = err?.message ?? (data as { message?: string } | null)?.message ?? (res.status === 413 ? 'Файл хэт том байна.' : 'Сервертэй холбогдоход алдаа гарлаа.');
     throw new ApiClientError(message, res.status, err?.code ?? 'ERROR', err?.details ?? data);
   }
   return data as T;

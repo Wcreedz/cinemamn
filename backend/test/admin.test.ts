@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import { env } from '../src/config/env';
 import { AdminLog, Category, Movie, Payment, Subscription, User, VideoJob } from '../src/models';
 import { VideoService } from '../src/services/video.service';
-import { api, login, makeMovie, resetDb, startDb, stopDb } from './helpers';
+import { api, login, makeMovie, resetDb, startDb, stopDb, uploadVideo } from './helpers';
 
 const movieBody = (over = {}) => ({ title: 'Шинэ кино', slug: 'shine-kino', description: 'тайлбар', isPublished: true, genres: [], cast: ['A'], ...over });
 
@@ -83,27 +83,18 @@ describe('Админ удирдлага', () => {
   it('видео байршуулалт дараалалд орж, HTTP хүсэлтэд FFmpeg ажиллахгүй', async () => {
     const m = await makeMovie({ videoStatus: 'none' });
     const { agent } = await login('admin');
-    const res = await agent.post(`/api/admin/movies/${m._id}/upload`).attach('video', Buffer.from('data'), { filename: 'a.mp4', contentType: 'video/mp4' });
+    const res = await uploadVideo(agent, m._id, Buffer.from('data'), 'a.mp4');
     expect(res.status).toBe(202);
     expect((await VideoJob.findById(res.body.jobId).lean())!.status).toBe('queued');
     expect((await Movie.findById(m._id).lean())!.videoStatus).toBe('queued');
-    const bad = await agent.post(`/api/admin/movies/${m._id}/upload`).attach('video', Buffer.from('x'), { filename: 'a.exe', contentType: 'application/x-msdownload' });
+    const bad = await uploadVideo(agent, m._id, Buffer.from('x'), 'a.exe');
     expect(bad.status).toBe(400);
-  });
-
-  it('видео файлын хэмжээний хязгаарыг тохиргооноос авна', async () => {
-    const m = await makeMovie({ videoStatus: 'none' });
-    const { agent } = await login('superadmin');
-    const { body } = await agent.get('/api/admin/settings');
-    await agent.put('/api/admin/settings/video').send({ value: { ...body.video.value, maxUploadSizeMb: 1 } });
-    const res = await agent.post(`/api/admin/movies/${m._id}/upload`).attach('video', Buffer.alloc(1024 * 1024 + 10), { filename: 'a.mp4', contentType: 'video/mp4' });
-    expect(res.status).toBe(400);
   });
 
   it('видео ажил эвдэрсэн файлаар амжилтгүй бол failed төлөвт орж, түр файл цэвэрлэгдэнэ', async () => {
     const m = await makeMovie({ videoStatus: 'none' });
     const { agent } = await login('admin');
-    await agent.post(`/api/admin/movies/${m._id}/upload`).attach('video', Buffer.from('not video'), { filename: 'a.mp4', contentType: 'video/mp4' });
+    await uploadVideo(agent, m._id, Buffer.from('not video'), 'a.mp4');
     const job = (await VideoService.claimNext())!;
     expect(job.status).toBe('processing');
     await VideoService.process(job);

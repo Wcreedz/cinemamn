@@ -31,6 +31,18 @@ export async function resetDb() {
 let counter = 0;
 export const nextPhone = () => `+9769${String(1000000 + ++counter).slice(-7)}`;
 
+// Киног админы хөтчийн адил хэсэгчлэн байршуулна. Эхний амжилтгүй хариуг буцаана.
+export async function uploadVideo(agent: ReturnType<typeof request.agent>, movieId: unknown, data: Buffer, fileName = 'kino.mp4') {
+  const base = `/api/admin/movies/${movieId}/upload`;
+  const start = await agent.post(`${base}/start`).send({ fileName, size: data.length, lastModified: 1 });
+  if (start.status !== 200) return start;
+  for (let i = 0; i * start.body.chunkSize < data.length; i++) {
+    const chunk = await agent.put(`${base}/${start.body.uploadId}/chunks/${i}`).set('Content-Type', 'application/octet-stream').send(data.subarray(i * start.body.chunkSize, (i + 1) * start.body.chunkSize));
+    if (chunk.status !== 200) return chunk;
+  }
+  return agent.post(`${base}/${start.body.uploadId}/complete`).send({});
+}
+
 export async function login(role: 'user' | 'admin' | 'superadmin' = 'user') {
   const phone = nextPhone();
   const password = 'Test-password-123';

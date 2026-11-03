@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import { env } from '../src/config/env';
 import { Movie, Subscription, VideoJob } from '../src/models';
 import { VideoService } from '../src/services/video.service';
-import { api, login, makeMovie, resetDb, startDb, stopDb } from './helpers';
+import { api, login, makeMovie, resetDb, startDb, stopDb, uploadVideo } from './helpers';
 
 const run = promisify(execFile);
 
@@ -32,7 +32,7 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     env.FFPROBE_PATH = 'ffprobe-not-installed';
     try {
       expect((await admin.agent.get('/api/admin/video-tools')).status).toBe(503);
-      const res = await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
+      const res = await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
       expect(res.status).toBe(503);
       expect(res.body.error.code).toBe('FFMPEG_MISSING');
       expect(res.body.error.message).toContain('apt install');
@@ -47,7 +47,7 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
   it('worker дээр FFmpeg алга бол эх файл хадгалагдаж, суулгасны дараа дахин байршуулахгүй боловсруулна', async () => {
     const movie = await makeMovie({ videoStatus: 'none' });
     const admin = await login('admin');
-    const up = await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
+    const up = await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
     expect(up.status).toBe(202);
     const job = (await VideoService.claimNext())!;
     const saved = env.FFPROBE_PATH;
@@ -75,19 +75,19 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
   it('шинэ файл байршуулахад хуучин амжилтгүй файл дискэнд үлдэхгүй', async () => {
     const movie = await makeMovie({ videoStatus: 'none' });
     const admin = await login('admin');
-    await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
     const job = (await VideoService.claimNext())!;
     const saved = env.FFPROBE_PATH;
     env.FFPROBE_PATH = 'ffprobe-not-installed';
     await VideoService.process(job).finally(() => { env.FFPROBE_PATH = saved; });
-    await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino2.mp4', contentType: 'video/mp4' });
+    await uploadVideo(admin.agent, movie._id, sample, 'kino2.mp4');
     await expect(fs.access(job.sourcePath)).rejects.toThrow();
   });
 
   it('эвдэрсэн файл нь дахин оролдох боломжгүй, эх файл устана', async () => {
     const movie = await makeMovie({ videoStatus: 'none' });
     const admin = await login('admin');
-    await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', Buffer.from('not a video'), { filename: 'bad.mp4', contentType: 'video/mp4' });
+    await uploadVideo(admin.agent, movie._id, Buffer.from('not a video'), 'bad.mp4');
     const job = (await VideoService.claimNext())!;
     await VideoService.process(job);
     await expect(fs.access(job.sourcePath)).rejects.toThrow();
@@ -98,7 +98,7 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
   it('admin байршуулж, worker боловсруулж, эрхтэй хэрэглэгч манифест ба сегмент авна', async () => {
     const movie = await makeMovie({ videoStatus: 'none' });
     const admin = await login('admin');
-    const up = await admin.agent.post(`/api/admin/movies/${movie._id}/upload`).attach('video', sample, { filename: 'kino.mp4', contentType: 'video/mp4' });
+    const up = await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
     expect(up.status).toBe(202);
 
     const job = (await VideoService.claimNext())!;

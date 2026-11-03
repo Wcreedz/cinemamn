@@ -1,21 +1,28 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, Film, ImageIcon, Loader2 } from 'lucide-react';
 import type { AdminMovie, Category } from '@mongolflix/shared';
 import { Field, Panel } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
-import { Badge, Notice } from '@/components/ui/misc';
+import { Badge, Banner, Notice } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
 import { useApi } from '@/hooks/use-api';
-import { api, API_BASE } from '@/lib/api';
+import { api, ApiClientError } from '@/lib/api';
 import { compressImage } from '@/lib/compress-image';
 
 const VIDEO_LABELS: Record<string, string> = { none: 'Видеогүй', uploading: 'Байршуулж байна', queued: 'Дараалалд', processing: 'Боловсруулж байна', ready: 'Бэлэн', failed: 'Алдаатай' };
+// Vercel-ээр дамжих зам тасалдаж болно: нэг хэсэг бүтэлгүйтвэл хүлээгээд давтана.
+const CHUNK_SENDERS = 4;
+const CHUNK_ATTEMPTS = 8;
+const MAX_BACKOFF_MS = 30_000;
 const POSTER_MAX_SIDE = 1200;
 const BACKDROP_MAX_SIDE = 1920;
+
+// Хуучин хувилбар хадгалсан англи бичиг: хэмжээний хязгаар одоо байхгүй.
+export const videoErrorText = (error: string) => (error === 'File too large' ? 'Өмнөх байршуулалт хэмжээний хязгаарт баригдсан. Одоо хязгааргүй тул файлаа дахин оруулна уу.' : error);
 
 export function VideoBadge({ movie }: { movie: Pick<AdminMovie, 'videoStatus' | 'videoProgress'> }) {
   const { videoStatus: status, videoProgress: percent } = movie;
@@ -28,10 +35,31 @@ export function VideoBadge({ movie }: { movie: Pick<AdminMovie, 'videoStatus' | 
   );
 }
 
-interface UploadState { loaded: number; total: number; speed: number }
-interface SaveTask { steps: string[]; current: number; upload: UploadState | null }
+const chunkBytes = (index: number, chunkSize: number, size: number) => Math.min(chunkSize, size - index * chunkSize);
 
-const duration = (seconds: number) => (seconds < 60 ? 'Бараг дууслаа' : seconds < 3600 ? `~${Math.ceil(seconds / 60)} мин үлдсэн` : `~${(seconds / 3600).toFixed(1)} цаг үлдсэн`);
+// Диск дүүрэх, FFmpeg алга байх зэргийг давтаад нэмэргүй: шалтгааныг нь шууд харуулна.
+const PERMANENT_CODES = new Set(['DISK_FULL', 'FFMPEG_MISSING']);
+const isTemporary = (err: unknown) => err instanceof ApiClientError && !PERMANENT_CODES.has(err.code) && (err.status === 0 || err.status >= 500 || err.status === 429 || err.status === 408);
+
+interface RetryHooks { stopped: () => boolean; onRetry: (attempt: number) => void }
+
+async function withRetry<T>(request: () => Promise<T>, { stopped, onRetry }: RetryHooks): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await request();
+    } catch (err) {
+      if (!isTemporary(err) || stopped()) throw err;
+      if (attempt >= CHUNK_ATTEMPTS) throw new Error('Холболт удаан тасарсан тул байршуулалт зогслоо. Өмнө орсон хэсгүүд хадгалагдсан: холболтоо шалгаад товчийг дахин дарвал тасарсан газраасаа үргэлжилнэ.');
+      onRetry(attempt);
+      await new Promise((r) => setTimeout(r, Math.min(MAX_BACKOFF_MS, 1000 * 2 ** (attempt - 1))));
+    }
+  }
+}
+
+interface UploadState { loaded: number; total: number; speed: number }
+interface SaveTask { steps: string[]; current: number; upload: UploadState | null; warning: string | null }
+
+const duration = (seconds: number) => (seconds < 60 ? `~${Math.ceil(seconds)} сек үлдсэн` : seconds < 3600 ? `~${Math.ceil(seconds / 60)} мин үлдсэн` : `~${(seconds / 3600).toFixed(1)} цаг үлдсэн`);
 
 // Хадгалалт, файл байршуулалтын аль шатанд явааг хаасан цонхоор харуулж, давхар дарахаас сэргийлнэ.
 function SaveProgress({ task }: { task: SaveTask }) {
@@ -57,6 +85,7 @@ function SaveProgress({ task }: { task: SaveTask }) {
               : <p className="text-xs text-muted-foreground">{percent}% · {fileSize(upload.loaded)} / {fileSize(upload.total)}{upload.speed > 0 ? ` · ${(upload.speed / 1024 ** 2).toFixed(1)} MB/с` : ''}{left !== null ? ` · ${duration(left)}` : ''}</p>}
           </div>
         )}
+        {task.warning && <Notice tone="warning" className="font-semibold">{task.warning}</Notice>}
         <p className="text-xs text-muted-foreground">Дуустал хуудсаа битгий хаагаарай.</p>
       </div>
     </div>
@@ -117,6 +146,9 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   const [video, setVideo] = useState<File | null>(null);
   const [images, setImages] = useState<{ poster: File | null; backdrop: File | null }>({ poster: null, backdrop: null });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const banner = useRef<HTMLDivElement>(null);
+  // Урт маягтын доор байсан ч үр дүн нүдэнд шууд өртөнө.
+  useEffect(() => { if (msg) banner.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, [msg]);
   const [task, setTask] = useState<SaveTask | null>(null);
   const busy = task !== null;
   const set =<K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) => setF((s) => ({ ...s, [k]: v }));
@@ -137,33 +169,40 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     setImages((s) => ({ ...s, [kind]: null }));
   };
 
-  // Том файлын явцыг харуулахын тулд fetch биш XHR ашиглана.
   const uploadVideo = async (id: string, file: File) => {
-    // Том файл дамжуулж дуусаад алдаа авахгүйн тулд серверийн бэлэн байдлыг эхлээд шалгана.
-    await api('/api/admin/video-tools');
-    const form = new FormData();
-    form.append('video', file);
+    const base = `/api/admin/movies/${id}/upload`;
+    const { uploadId, chunkSize, received } = await api<{ uploadId: string; chunkSize: number; received: number[] }>(`${base}/start`, { body: { fileName: file.name, size: file.size, lastModified: file.lastModified } });
+    const done = new Set(received);
+    const count = Math.ceil(file.size / chunkSize);
+    const queue = Array.from({ length: count }, (_, i) => i).filter((i) => !done.has(i));
+    let loaded = received.reduce((sum, i) => sum + chunkBytes(i, chunkSize, file.size), 0);
+    let sent = 0;
     const startedAt = Date.now();
-    const setUpload = (upload: UploadState | null) => setTask((t) => t && { ...t, upload });
-    setUpload({ loaded: 0, total: file.size, speed: 0 });
+    const setUpload = (upload: UploadState | null) => setTask((t) => t && { ...t, upload, warning: null });
+    setUpload({ loaded, total: file.size, speed: 0 });
+    let failed = false;
+    const hooks: RetryHooks = {
+      stopped: () => failed,
+      onRetry: (attempt) => setTask((t) => t && { ...t, warning: `Холболт тасарлаа. Дахин оролдож байна (${attempt}/${CHUNK_ATTEMPTS - 1})…` }),
+    };
+    const sender = async () => {
+      for (let index = queue.shift(); index !== undefined && !failed; index = queue.shift()) {
+        const bytes = chunkBytes(index, chunkSize, file.size);
+        const raw = file.slice(index * chunkSize, index * chunkSize + bytes);
+        try {
+          await withRetry(() => api(`${base}/${uploadId}/chunks/${index}`, { method: 'PUT', raw }), hooks);
+        } catch (err) {
+          failed = true;
+          throw err;
+        }
+        loaded += bytes;
+        sent += bytes;
+        setUpload({ loaded, total: file.size, speed: sent / Math.max(1, (Date.now() - startedAt) / 1000) });
+      }
+    };
     try {
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_BASE}/api/admin/movies/${id}/upload`);
-        xhr.withCredentials = true;
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setUpload({ loaded: e.loaded, total: e.total, speed: e.loaded / Math.max(1, (Date.now() - startedAt) / 1000) });
-        };
-        xhr.onloadend = () => {
-          if (xhr.status === 202) { resolve(); return; }
-          let text = xhr.status === 0 || xhr.status >= 502
-            ? 'Холболт тасарлаа. Файл том бол Vercel-ээр дамжихгүй байж магадгүй: серверийн шууд хаягаар админд орж байршуулна уу.'
-            : 'Видео байршуулахад алдаа гарлаа.';
-          try { text = JSON.parse(xhr.responseText).error.message; } catch { /* JSON биш хариу */ }
-          reject(new Error(text));
-        };
-        xhr.send(form);
-      });
+      await Promise.all(Array.from({ length: CHUNK_SENDERS }, sender));
+      await withRetry(() => api(`${base}/${uploadId}/complete`, { method: 'POST', body: {} }), hooks);
       setVideo(null);
     } finally {
       setUpload(null);
@@ -176,7 +215,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     const hasImages = !!(images.poster || images.backdrop);
     setTask({
       steps: ['Мэдээлэл хадгалж байна', ...(hasImages ? ['Зураг байршуулж байна'] : []), ...(video ? ['Кино файл байршуулж байна'] : [])],
-      current: 0, upload: null,
+      current: 0, upload: null, warning: null,
     });
     const nextStep = () => setTask((t) => t && { ...t, current: t.current + 1 });
     const body = {
@@ -238,6 +277,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   return (
     <form onSubmit={(e) => void save(e)} className="grid gap-6 xl:grid-cols-[2fr_1fr]">
       {task && <SaveProgress task={task} />}
+      {msg && <div ref={banner} className="xl:col-span-2"><Banner tone={msg.ok ? 'success' : 'danger'} title={msg.ok ? 'Амжилттай' : 'Амжилтгүй боллоо'}>{msg.text}</Banner></div>}
       <div className="min-w-0 space-y-6">
         <Panel className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -247,7 +287,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
           <FilePicker large label={movie?.videoStatus === 'ready' ? 'Киног солих бол шинэ файл сонгоно уу' : 'Энд дарж кино файлаа сонгоно уу'} accept="video/*,.mkv" file={video} disabled={busy} onPick={setVideo} />
           <p className="text-xs text-muted-foreground">MP4, MKV, MOV, WEBM, AVI. Файл сонгосны дараа доорх мэдээллийг бөглөөд &quot;{movie ? 'Хадгалах' : 'Кино нэмэх'}&quot; товчийг дарна.</p>
           {processing &&<Notice>Кино боловсруулагдаж байна. Хуудсаа хаасан ч үргэлжилнэ, дуусмагц &quot;Бэлэн&quot; болно.</Notice>}
-          {current?.videoError && <Notice tone="danger">{current.videoError}</Notice>}
+          {current?.videoError && <Banner tone="danger" title="Кино боловсруулж чадсангүй">{videoErrorText(current.videoError)}</Banner>}
           {current?.videoRetryable && <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => void retryVideo()}>Дахин боловсруулах</Button>}
         </Panel>
         <Panel className="space-y-4">
@@ -270,7 +310,6 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
         <Panel className="space-y-4">
           <label className="flex items-center justify-between gap-3 text-sm font-semibold"><span>Нийтлэх<span className="block text-xs font-normal text-muted-foreground">Асаавал сайтад харагдана.</span></span><Switch checked={f.isPublished} onCheckedChange={(v) => set('isPublished', v)} /></label>
           <label className="flex items-center justify-between gap-3 text-sm font-semibold">Онцлох<Switch checked={f.featured} onCheckedChange={(v) => set('featured', v)} /></label>
-          {msg && <Notice tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Notice>}
           <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Хадгалж байна…' : movie ? 'Хадгалах' : 'Кино нэмэх'}</Button>
           {movie && f.isPublished && <Button asChild variant="outline" className="w-full"><Link href={`/movies/${movie.slug}`} target="_blank">Урьдчилж харах</Link></Button>}
           {movie && <Button type="button" variant="destructive" className="w-full" disabled={busy} onClick={() => void remove()}>Устгах</Button>}

@@ -12,6 +12,7 @@ import { PaymentService } from '../services/payment.service';
 import { SubscriptionService } from '../services/subscription.service';
 import { VideoService } from '../services/video.service';
 import { VideoConfigurationService } from '../services/videoConfiguration.service';
+import { VideoUploadService } from '../services/videoUpload.service';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors';
 import { escapeRegex, objectId, paged, pageQuery, parse, sortFrom } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
@@ -217,45 +218,32 @@ export async function deleteMovie(req: Request, res: Response) {
   const dirs = VideoConfigurationService.dirs(storageRoot);
   await fs.rm(path.join(dirs.hls, String(id)), { recursive: true, force: true });
   if (m.videoSource) await fs.rm(m.videoSource, { force: true });
+  await VideoUploadService.discardForMovie(String(id));
   await WatchHistory.deleteMany({ movieId: id });
   await logAdmin(req, 'movie.delete', { type: 'Movie', id }, { title: m.title });
   res.json({ ok: true });
 }
 
-const VIDEO_MIMES = new Set(['video/mp4', 'video/x-matroska', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'application/octet-stream']);
-const VIDEO_EXTS = new Set(['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v']);
+const uploadStartSchema = z.object({ fileName: z.string().trim().min(1).max(255), size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), lastModified: z.number().int() });
+const uploadChunkParams = z.object({ uploadId: objectId, index: z.coerce.number().int().min(0) });
 
-export async function uploadVideo(req: Request, res: Response) {
+export async function startVideoUpload(req: Request, res: Response) {
+  res.json(await VideoUploadService.start(String(idParam(req)), parse(uploadStartSchema, req.body)));
+}
+
+export async function uploadVideoChunk(req: Request, res: Response) {
+  const { uploadId, index } = parse(uploadChunkParams, req.params);
+  await VideoUploadService.writeChunk(String(idParam(req)), uploadId, index, req.body);
+  res.json({ ok: true });
+}
+
+export async function completeVideoUpload(req: Request, res: Response) {
   const id = idParam(req);
-  if (!(await Movie.exists({ _id: id }))) throw notFound('Кино олдсонгүй.');
-  await VideoService.checkTools();
-  const settings = await VideoConfigurationService.get({ fresh: true });
-  const { temp } = VideoConfigurationService.dirs(settings.storageRoot);
-  await fs.mkdir(temp, { recursive: true });
-  await Movie.updateOne({ _id: id }, { $set: { videoStatus: 'uploading' } });
-  const upload = multer({
-    storage: multer.diskStorage({
-      destination: temp,
-      filename: (_r, file, cb) => cb(null, `upload-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
-    }),
-    limits: { fileSize: settings.maxUploadSizeMb * 1024 * 1024, files: 1 },
-    fileFilter: (_r, file, cb) => {
-      const ok = VIDEO_MIMES.has(file.mimetype) && VIDEO_EXTS.has(path.extname(file.originalname).toLowerCase());
-      if (ok) cb(null, true);
-      else cb(badRequest('Зөвхөн видео файл (mp4, mkv, mov, webm, avi) байршуулна.'));
-    },
-  }).single('video');
-  try {
-    await new Promise<void>((resolve, reject) => upload(req, res, (err) => (err ? reject(err) : resolve())));
-    if (!req.file) throw badRequest('Видео файл сонгоно уу.');
-  } catch (err) {
-    await Movie.updateOne({ _id: id }, { $set: { videoStatus: 'failed', videoError: (err as Error).message } });
-    throw err;
-  }
+  const { uploadId } = parse(uploadChunkParams.pick({ uploadId: true }), req.params);
   // Хүнд FFmpeg ажлыг HTTP хүсэлтэд биш, тусдаа worker-т өгнө.
-  const job = await VideoService.enqueue(String(id), req.file.path);
-  await logAdmin(req, 'movie.video_upload', { type: 'Movie', id }, { jobId: String(job._id), size: req.file.size });
-  res.status(202).json({ jobId: String(job._id), videoStatus: 'queued' });
+  const { jobId, size } = await VideoUploadService.complete(String(id), uploadId);
+  await logAdmin(req, 'movie.video_upload', { type: 'Movie', id }, { jobId, size });
+  res.status(202).json({ jobId, videoStatus: 'queued' });
 }
 
 // Гарчгаас биш файлын эхний байтаас зургийн төрлийг тодорхойлно.

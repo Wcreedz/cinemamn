@@ -2,6 +2,7 @@ import { connectDb } from '../config/db';
 import { PaymentService } from '../services/payment.service';
 import { SubscriptionService } from '../services/subscription.service';
 import { VideoService } from '../services/video.service';
+import { VideoUploadService } from '../services/videoUpload.service';
 
 const POLL_MS = 5_000;
 // Төлсөн хэрэглэгч эрхээ хүлээх дээд хугацааг тодорхойлдог тул богино байна.
@@ -10,6 +11,7 @@ const HOUSEKEEPING_MS = 60_000;
 async function housekeeping() {
   const [subs, pays] = await Promise.all([SubscriptionService.expireDue(), PaymentService.expirePending()]);
   await VideoService.requeueStale();
+  await VideoUploadService.cleanup();
   const repaired = await PaymentService.repairIncomplete();
   if (repaired.activated || repaired.cancelled) console.warn(`[worker] нөхөв: ${repaired.activated} төлбөрийн эрх, ${repaired.cancelled} цуцлалт`);
   if (subs || pays) console.info(`[worker] ${subs} эрх, ${pays} нэхэмжлэх дууссанд тооцов`);

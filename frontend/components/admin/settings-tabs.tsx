@@ -36,7 +36,7 @@ export interface AllSettings {
 interface General { siteName: string; logo: string; favicon: string; description: string; maintenanceMode: boolean }
 interface PlanRow { code: string; name: string; price: number; durationDays: number; enabled: boolean }
 interface Subscription { enabled: boolean; paymentRequired: boolean; currency: string; paymentExpiryMinutes: number; plans: PlanRow[] }
-interface Video { storageRoot: string; hlsResolutions: number[]; maxUploadSizeMb: number; ffmpeg: { preset: string; crf: number; segmentSeconds: number; threads: number }; playbackTokenExpiryMinutes: number }
+interface Video { storageRoot: string; hlsResolutions: number[]; ffmpeg: { preset: string; crf: number; segmentSeconds: number; threads: number }; playbackTokenExpiryMinutes: number }
 interface Security { sessionExpiryDays: number; loginMaxAttempts: number; loginLockMinutes: number; allowedAdminIps: string[] }
 interface Banner { title: string; subtitle?: string; image?: string; link?: string; enabled: boolean }
 interface Section { key: string; title: string; type: 'new' | 'popular' | 'continue' | 'category'; categorySlug?: string; visible: boolean; order: number }
@@ -141,7 +141,6 @@ export function VideoTab({ entry, roots, reload }: { entry: Entry<Video>; roots:
         <p className="mt-1 text-xs text-muted-foreground">Эх файлаас өндөр чанар үүсгэхгүй.</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Файлын дээд хэмжээ (MB)"><NumberInput min={1} value={f.maxUploadSizeMb} onChange={(v) => setForm({ ...f, maxUploadSizeMb: v })} /></Field>
         <Field label="Тоглуулах токены хугацаа (мин)"><NumberInput min={1} value={f.playbackTokenExpiryMinutes} onChange={(v) => setForm({ ...f, playbackTokenExpiryMinutes: v })} /></Field>
       </div>
       <h3 className="pt-2 font-bold">FFmpeg</h3>
