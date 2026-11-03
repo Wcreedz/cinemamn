@@ -23,10 +23,6 @@ const MAX_BACKOFF_MS = 30_000;
 // Хуучин хувилбар хадгалсан англи бичиг: хэмжээний хязгаар одоо байхгүй.
 export const videoErrorText = (error: string) => (error === 'File too large' ? 'Өмнөх байршуулалт хэмжээний хязгаарт баригдсан. Одоо хязгааргүй тул файлаа дахин оруулна уу.' : error);
 
-// Зогссон байршуулалт хадгалагдсан хэвээр: ижил файлыг сонговол тэндээсээ үргэлжилнэ.
-export const UploadStalledNote = ({ movie }: { movie: Pick<AdminMovie, 'videoUpload'> }) => (movie.videoUpload?.stalled
-  ? <p className="mt-1 max-w-xs text-xs text-muted-foreground">Цонх хаагдсан эсвэл холболт тасарсан байна. &quot;Засах&quot; дээр ижил файлаа сонговол тасарсан газраасаа үргэлжилнэ.</p>
-  : null);
 export const isWorking = (movie: Pick<AdminMovie, 'videoStatus' | 'videoUpload'>) => movie.videoStatus === 'queued' || movie.videoStatus === 'processing' || !!movie.videoUpload;
 
 export function VideoBadge({ movie }: { movie: Pick<AdminMovie, 'videoStatus' | 'videoProgress' | 'videoUpload'> }) {
@@ -280,6 +276,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   const processing = movie?.videoStatus === 'queued' || movie?.videoStatus === 'processing';
   // Файл орсны дараа солихгүй: өөр файл оруулах бол киног устгаад шинээр бүртгэнэ.
   const hasVideo = !!movie && (movie.videoPlayable || movie.videoStatus === 'ready' || processing);
+  const resumable = movie?.videoUpload;
 
   return (
     <form onSubmit={(e) => void save(e)}>
@@ -293,11 +290,13 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
               ? <Badge tone={movie.isPublished ? 'success' : 'neutral'} className="whitespace-nowrap">{movie.isPublished ? 'Нийтлэгдсэн' : 'Нийтлэгдээгүй'}</Badge>
               : <VideoBadge movie={movie} />)}
           </div>
-          {movie && <UploadStalledNote movie={movie} />}
           {movie && <VideoTimes movie={movie} />}
           {hasVideo ? <p className="text-xs text-muted-foreground">Кино файл орсон байна. Өөр файл оруулах бол киног жагсаалтаас устгаад шинээр бүртгэнэ үү.</p> : (
             <>
-              <FilePicker large label="Энд дарж кино файлаа сонгоно уу" accept="video/*,.mkv" file={video} disabled={busy} onPick={setVideo} />
+              <FilePicker large label={resumable ? `Үргэлжлүүлэх бол "${resumable.fileName}" файлаа сонгоно уу` : 'Энд дарж кино файлаа сонгоно уу'} accept="video/*,.mkv" file={video} disabled={busy} onPick={setVideo} />
+              {video && resumable && !task && (video.name === resumable.fileName
+                ? <Notice tone="success">Хадгалах дарвал {resumable.percent}%-иас үргэлжилнэ.</Notice>
+                : <Notice tone="warning">Өөр файл сонгосон тул өмнө орсон {resumable.percent}% устаж, эхнээс нь орно.</Notice>)}
               {video && !task && <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setVideo(null)}>Сонгосон файлыг болих</Button>}
               <p className="text-xs text-muted-foreground">MP4, MKV, MOV, WEBM, AVI. Файл сонгосны дараа &quot;{movie ? 'Хадгалах' : 'Кино нэмэх'}&quot; товчийг дарна.</p>
             </>

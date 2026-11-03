@@ -131,16 +131,16 @@ describe('Видео хэсэгчлэн байршуулах', () => {
   it('жагсаалт байршуулалтын явцыг харуулж, дуусмагц алга болно', async () => {
     const { movie, agent, start, send, complete } = await begin();
     const listed = async () => (await agent.get('/api/admin/movies')).body.items.find((m: { id: string }) => m.id === String(movie._id));
-    expect((await listed()).videoUpload).toEqual({ percent: 0, stalled: false });
+    expect((await listed()).videoUpload).toEqual({ fileName: 'kino.mp4', percent: 0, stalled: false });
     await send(0, bytes(CHUNK, 1));
-    expect((await listed()).videoUpload).toEqual({ percent: 33, stalled: false });
+    expect((await listed()).videoUpload).toEqual({ fileName: 'kino.mp4', percent: 33, stalled: false });
     expect((await agent.get(`/api/admin/movies/${movie._id}`)).body.videoUpload.percent).toBe(33);
 
     await VideoUpload.collection.updateOne({ _id: new Types.ObjectId(start.uploadId) }, { $set: { updatedAt: new Date(Date.now() - 10 * 60_000) } });
-    expect((await listed()).videoUpload).toEqual({ percent: 33, stalled: true });
+    expect((await listed()).videoUpload).toEqual({ fileName: 'kino.mp4', percent: 33, stalled: true });
 
     await send(1, bytes(CHUNK, 2));
-    expect((await listed()).videoUpload).toEqual({ percent: 66, stalled: false });
+    expect((await listed()).videoUpload).toEqual({ fileName: 'kino.mp4', percent: 66, stalled: false });
     await send(2, bytes(100, 3));
     expect((await complete()).status).toBe(202);
     const after = await listed();

@@ -110,8 +110,9 @@ export const VideoUploadService = {
 
   // Кино байршуулагдаж дуустал Movie-д тэмдэглэгдэхгүй: жагсаалт явцыг эндээс уншина.
   async progressFor(movieIds: unknown[], now = Date.now()) {
-    const uploads = await VideoUpload.find({ movieId: { $in: movieIds }, status: 'uploading' }).select('movieId size received updatedAt').sort({ updatedAt: 1 }).lean();
+    const uploads = await VideoUpload.find({ movieId: { $in: movieIds }, status: 'uploading' }).select('movieId fileName size received updatedAt').sort({ updatedAt: 1 }).lean();
     return new Map(uploads.map((u) => [String(u.movieId), {
+      fileName: u.fileName,
       percent: Math.floor((u.received.length / chunkCount(u.size)) * 100),
       stalled: now - (u.updatedAt?.getTime() ?? 0) > STALLED_MS,
     }]));

@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { AdminMovie, Paginated } from '@mongolflix/shared';
-import { DELETE_DETAIL, deleteQuestion, isWorking, UploadStalledNote, VideoBadge, VideoTimes, videoErrorText } from '@/components/admin/movie-form';
+import { DELETE_DETAIL, deleteQuestion, VideoBadge, VideoTimes, videoErrorText } from '@/components/admin/movie-form';
 import { PageHeader, Table } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { Confirm } from '@/components/ui/confirm';
@@ -43,14 +43,12 @@ export default function AdminMovies() {
   const { data, error, loading, reload } = useApi<Paginated<AdminMovie>>(`/api/admin/movies?page=${page}&q=${encodeURIComponent(q)}`);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const working = !!data?.items.some(isWorking);
 
-  // Worker дуусахад хуудсаа шинэчлэхгүйгээр төлөв солигдоно.
+  // Кино өөр табаас орж болно: юу ч явагдаагүй байхад нээсэн жагсаалт ч шинэ төлөвийг харуулна.
   useEffect(() => {
-    if (!working) return;
-    const t = setInterval(() => void reload(), POLL_MS);
+    const t = setInterval(() => { if (!document.hidden) void reload(); }, POLL_MS);
     return () => clearInterval(t);
-  }, [working, reload]);
+  }, [reload]);
 
   const remove = async (m: AdminMovie) => {
     setDeleting(m.id);
@@ -81,10 +79,10 @@ export default function AdminMovies() {
               <tr key={m.id}>
                 <td className="px-4 py-3"><Link href={`/admin/movies/${m.id}`} className="font-semibold text-primary hover:underline">{m.title}</Link>{m.featured && <Badge tone="primary" className="ml-2">Онцлох</Badge>}</td>
                 <td className="px-4 py-3"><Badge tone={m.isPublished ? 'success' : 'neutral'}>{m.isPublished ? 'Нийтлэгдсэн' : 'Ноорог: сайтад харагдахгүй'}</Badge></td>
-                <td className="px-4 py-3">{m.videoStatus !== 'ready' && <VideoBadge movie={m} />}<UploadStalledNote movie={m} /><VideoTimes movie={m} />{m.videoStatus === 'ready' && m.videoUploadSeconds === undefined && m.videoProcessSeconds === undefined && <span className="text-muted-foreground">—</span>}{m.videoError && <p className="mt-1 max-w-xs text-xs font-medium text-destructive">{videoErrorText(m.videoError)}</p>}</td>
+                <td className="px-4 py-3">{m.videoStatus !== 'ready' && <VideoBadge movie={m} />}<VideoTimes movie={m} />{m.videoStatus === 'ready' && m.videoUploadSeconds === undefined && m.videoProcessSeconds === undefined && <span className="text-muted-foreground">—</span>}{m.videoError && <p className="mt-1 max-w-xs text-xs font-medium text-destructive">{videoErrorText(m.videoError)}</p>}</td>
                 <td className="px-4 py-3">{m.viewCount}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">
-                  <Button asChild size="sm" variant="outline" className="mr-2"><Link href={`/admin/movies/${m.id}`}>Засах</Link></Button>
+                  <Button asChild size="sm" variant="outline" className="mr-2"><Link href={`/admin/movies/${m.id}`}>{m.videoUpload?.stalled ? 'Үргэлжлүүлэх' : 'Засах'}</Link></Button>
                   <Confirm question={deleteQuestion(m.title)} detail={DELETE_DETAIL} onConfirm={() => void remove(m)}>
                     <Button size="sm" variant="ghost" className="text-destructive" aria-label={`${m.title} устгах`} disabled={deleting !== null}>{deleting === m.id ? 'Устгаж байна…' : <><Trash2 />Устгах</>}</Button>
                   </Confirm>
