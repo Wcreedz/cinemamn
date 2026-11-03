@@ -17,7 +17,8 @@ export const profileSchema = z.object({ name: z.string().trim().max(80) });
 
 export const movieInput = z.object({
   title: z.string().trim().min(1).max(200),
-  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/, 'Slug-д латин жижиг үсэг, тоо, зураас ашиглана').max(200),
+  // Заагаагүй бол шинэ кинонд гарчгаас үүснэ, засахад хуучин нь хэвээр үлдэж холбоос эвдрэхгүй.
+  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/, 'Slug-д латин жижиг үсэг, тоо, зураас ашиглана').max(200).optional(),
   originalTitle: z.string().trim().max(200).optional(),
   description: z.string().max(5000).default(''),
   poster: z.string().trim().max(1000).optional(),
@@ -26,7 +27,8 @@ export const movieInput = z.object({
   duration: z.number().int().min(0).optional(),
   releaseYear: z.number().int().min(1888).max(2100).optional(),
   genres: z.array(objectId).default([]),
-  cast: z.array(z.string().trim().max(120)).default([]),
+  // Маягтад байхгүй: default([]) байвал засах бүрт хуучин утгыг устгана. Шинэ кинонд model-ийн default үйлчилнэ.
+  cast: z.array(z.string().trim().max(120)).optional(),
   director: z.string().trim().max(120).optional(),
   language: z.string().trim().max(60).optional(),
   country: z.string().trim().max(60).optional(),

@@ -44,7 +44,7 @@ export async function history(req: Request, res: Response) {
   const q = parse(pageQuery, req.query);
   const filter = { action: { $regex: '^settings\\.' } };
   const [items, total] = await Promise.all([
-    AdminLog.find(filter).sort({ createdAt: -1 }).skip((q.page - 1) * q.limit).limit(q.limit).populate('adminId', 'phone name').lean(),
+    AdminLog.find(filter).sort({ createdAt: -1 }).skip((q.page - 1) * q.limit).limit(q.limit).populate('adminId', 'email phone name').lean(),
     AdminLog.countDocuments(filter),
   ]);
   res.json(paged(items, total, q.page, q.limit));

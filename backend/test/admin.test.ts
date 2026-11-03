@@ -38,6 +38,46 @@ describe('Админ удирдлага', () => {
     expect(await Movie.countDocuments()).toBe(0);
     const actions = (await AdminLog.find().lean()).map((l) => l.action);
     expect(actions).toEqual(expect.arrayContaining(['movie.create', 'movie.update', 'movie.delete']));
+    // Админ имэйлээр нэвтэрдэг тул түүхэнд имэйлээр нь ялгагдана.
+    const logs = await agent.get('/api/admin/logs');
+    expect(logs.body.items[0].adminId.email).toContain('@example.com');
+  });
+
+  it('маягтад байхгүй талбарууд заавал биш, засахад хуучин киноны утгууд устахгүй', async () => {
+    const { agent } = await login('admin');
+    const minimal = { title: 'Богино кино', description: '', genres: [], isPublished: true, featured: false };
+    const fresh = await agent.post('/api/admin/movies').send(minimal);
+    expect(fresh.status).toBe(201);
+    expect(fresh.body.cast).toEqual([]);
+    const old = await makeMovie({ cast: ['Жүжигчин'], director: 'Найруулагч', releaseYear: 1999, duration: 5400, language: 'Монгол', country: 'Монгол' });
+    const upd = await agent.put(`/api/admin/movies/${old._id}`).send({ ...minimal, title: 'Зассан' });
+    expect(upd.status).toBe(200);
+    expect(upd.body).toMatchObject({ title: 'Зассан', slug: old.slug, cast: ['Жүжигчин'], director: 'Найруулагч', releaseYear: 1999, duration: 5400, language: 'Монгол', country: 'Монгол' });
+  });
+
+  it('slug гарчгаас автоматаар үүсч, давхцвал дугаар авна', async () => {
+    const { agent } = await login('admin');
+    const create = async (title: string) => (await agent.post('/api/admin/movies').send({ title, description: '', genres: [], isPublished: true, featured: false })).body.slug;
+    expect(await create('Шинэ цагаан сар!')).toBe('shine-tsagaan-sar');
+    expect(await create('Шинэ цагаан сар')).toBe('shine-tsagaan-sar-2');
+    expect(await create('Шинэ, цагаан сар')).toBe('shine-tsagaan-sar-3');
+    expect(await create('Өвөл Үүр')).toBe('ovol-uur');
+    expect(await create('Hello World 2')).toBe('hello-world-2');
+    // Латин болж чадахгүй гарчиг ч кино нэмэхэд саад болохгүй.
+    expect(await create('!!!')).toBe('kino');
+    expect(await create('???')).toBe('kino-2');
+    expect((await create('я'.repeat(200))).length).toBeLessThanOrEqual(100);
+    expect((await api().get('/api/movies/shine-tsagaan-sar-2')).status).toBe(200);
+  });
+
+  it('гарчиг засахад slug солигдохгүй: тарсан холбоос ажилласаар байна', async () => {
+    const { agent } = await login('admin');
+    const body = { title: 'Анхны нэр', description: '', genres: [], isPublished: true, featured: false };
+    const created = await agent.post('/api/admin/movies').send(body);
+    const upd = await agent.put(`/api/admin/movies/${created.body.id}`).send({ ...body, title: 'Шинэ нэр' });
+    expect(upd.body.title).toBe('Шинэ нэр');
+    expect(upd.body.slug).toBe(created.body.slug);
+    expect((await api().get(`/api/movies/${created.body.slug}`)).status).toBe(200);
   });
 
   it('видео байршуулалт дараалалд орж, HTTP хүсэлтэд FFmpeg ажиллахгүй', async () => {

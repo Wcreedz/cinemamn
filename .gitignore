@@ -13,4 +13,4 @@ video-server/storage/*
 backups/
 .DS_Store
 next-env.d.ts
-logs/
+/logs/

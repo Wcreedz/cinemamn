@@ -15,6 +15,7 @@ import { VideoConfigurationService } from '../services/videoConfiguration.servic
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors';
 import { escapeRegex, objectId, paged, pageQuery, parse, sortFrom } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
+import { toSlug } from '../utils/slug';
 import { adminCreateSchema, adminRoleSchema, categoryInput, extendSchema, movieInput, refundSchema, userPasswordSchema, userStatusSchema } from '../validators';
 import { movieDetail } from './movie.controller';
 
@@ -179,8 +180,22 @@ export async function retryVideo(req: Request, res: Response) {
   res.status(202).json({ videoStatus: 'queued' });
 }
 
+// Давхцлыг unique index шийднэ: урьдчилж шалгавал зэрэг нэмэхэд давхцаж болно.
+async function createWithUniqueSlug(input: z.infer<typeof movieInput>) {
+  if (input.slug) return Movie.create(input);
+  const base = toSlug(input.title);
+  for (let n = 1; ; n++) {
+    try {
+      return await Movie.create({ ...input, slug: n === 1 ? base : `${base}-${n}` });
+    } catch (err) {
+      const e = err as { code?: number; keyPattern?: Record<string, unknown> };
+      if (e.code !== 11000 || !e.keyPattern?.slug) throw err;
+    }
+  }
+}
+
 export async function createMovie(req: Request, res: Response) {
-  const m = await Movie.create(parse(movieInput, req.body));
+  const m = await createWithUniqueSlug(parse(movieInput, req.body));
   await logAdmin(req, 'movie.create', { type: 'Movie', id: m._id }, { title: m.title });
   res.status(201).json(adminMovie((await Movie.findById(m._id).populate('genres').lean())!));
 }
@@ -363,7 +378,7 @@ export async function listLogs(req: Request, res: Response) {
   const q = parse(pageQuery.extend({ action: z.string().regex(/^[\w.]+$/).optional() }), req.query);
   const filter = q.action ? { action: { $regex: `^${escapeRegex(q.action)}` } } : {};
   const [items, total] = await Promise.all([
-    AdminLog.find(filter).sort({ createdAt: -1 }).skip((q.page - 1) * q.limit).limit(q.limit).populate('adminId', 'phone name').lean(),
+    AdminLog.find(filter).sort({ createdAt: -1 }).skip((q.page - 1) * q.limit).limit(q.limit).populate('adminId', 'email phone name').lean(),
     AdminLog.countDocuments(filter),
   ]);
   res.json(paged(items, total, q.page, q.limit));
