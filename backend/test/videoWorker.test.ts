@@ -111,6 +111,11 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     const after = await Movie.findById(movie._id).select('+videoSource +hlsPath').lean();
     expect(after!.videoStatus).toBe('ready');
     expect(after!.videoProgress).toBeUndefined();
+    expect(after!.videoUploadSeconds).toBeGreaterThanOrEqual(0);
+    expect(after!.videoProcessSeconds).toBeGreaterThanOrEqual(0);
+    const listed = await admin.agent.get(`/api/admin/movies/${movie._id}`);
+    expect(listed.body.videoProcessSeconds).toBe(after!.videoProcessSeconds);
+    expect(listed.body.videoUploadSeconds).toBe(after!.videoUploadSeconds);
     expect(Math.round(after!.duration!)).toBe(4);
     expect(after!.hlsPath).toBe(`hls/${movie._id}`);
     expect((await VideoJob.findById(up.body.jobId).lean())!.status).toBe('ready');

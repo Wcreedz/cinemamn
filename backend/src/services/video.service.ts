@@ -143,7 +143,8 @@ export const VideoService = {
     const dirs = VideoConfigurationService.dirs(settings.storageRoot);
     const movieId = String(job.movieId);
     const work = path.join(dirs.temp, `job-${job._id}`);
-    await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'processing', videoProgress: 0 } });
+    await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'processing', videoProgress: 0 }, $unset: { videoProcessSeconds: 1 } });
+    const startedAt = Date.now();
     let reported = 0;
     // Явц бичих бүрт түгжээг сунгана: ажиллаж байгаа урт киног requeueStale давхар эхлүүлэхгүй.
     const onProgress = (fraction: number) => {
@@ -168,7 +169,7 @@ export const VideoService = {
       const original = path.join(dirs.originals, `${movieId}${path.extname(job.sourcePath)}`);
       await fs.rename(job.sourcePath, original);
       await Movie.updateOne({ _id: movieId }, {
-        $set: { videoStatus: 'ready', hlsPath: `hls/${movieId}`, videoSource: original, duration: Math.round(info.duration) },
+        $set: { videoStatus: 'ready', hlsPath: `hls/${movieId}`, videoSource: original, duration: Math.round(info.duration), videoProcessSeconds: Math.round((Date.now() - startedAt) / 1000) },
         $unset: { videoError: 1, videoProgress: 1 },
       });
       await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'ready', sourcePath: original, finishedAt: new Date() }, $unset: { error: 1 } });

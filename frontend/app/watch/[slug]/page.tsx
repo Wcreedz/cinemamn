@@ -6,8 +6,8 @@ import Hls from 'hls.js';
 import { ArrowLeft } from 'lucide-react';
 import type { MovieDetail, PlaybackGrant } from '@mongolflix/shared';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/input';
 import { ErrorState, Spinner } from '@/components/ui/misc';
+import { VideoPlayerControls } from '@/components/video-player-controls';
 import { api, ApiClientError } from '@/lib/api';
 
 const PROGRESS_EVERY_MS = 15_000;
@@ -16,6 +16,7 @@ export default function WatchPage() {
   const { slug } = useParams<{ slug: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [levels, setLevels] = useState<{ index: number; height: number }[]>([]);
@@ -99,12 +100,6 @@ export default function WatchPage() {
       <div className="flex items-center gap-3 p-3">
         <Button asChild variant="ghost" size="icon" aria-label="Буцах"><Link href={movie ? `/movies/${movie.slug}` : '/movies'}><ArrowLeft /></Link></Button>
         <h1 className="line-clamp-1 flex-1 font-semibold">{movie?.title}</h1>
-        {levels.length > 1 && (
-          <Select aria-label="Чанар" className="w-auto" value={level} onChange={(e) => changeLevel(Number(e.target.value))}>
-            <option value={-1}>Автомат</option>
-            {levels.map((l) => <option key={l.index} value={l.index}>{l.height}p</option>)}
-          </Select>
-        )}
       </div>
       {error ? (
         <div className="m-auto max-w-md p-4">
@@ -114,9 +109,10 @@ export default function WatchPage() {
           )}
         </div>
       ) : (
-        <div className="relative flex flex-1 items-center justify-center">
+        <div ref={playerRef} className="relative flex flex-1 items-center justify-center bg-black">
           {!ready && <Spinner className="absolute size-10" />}
-          <video ref={videoRef} controls playsInline className="max-h-[calc(100dvh-4rem)] w-full" onPause={saveProgress} onEnded={saveProgress} controlsList="nodownload" />
+          <video ref={videoRef} playsInline className="max-h-[calc(100dvh-4rem)] w-full in-fullscreen:max-h-dvh" onPause={saveProgress} onEnded={saveProgress} />
+          {ready && <VideoPlayerControls videoRef={videoRef} containerRef={playerRef} levels={levels} level={level} onLevel={changeLevel} />}
         </div>
       )}
     </main>

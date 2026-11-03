@@ -147,7 +147,7 @@ export async function setAdminRole(req: Request, res: Response) {
 }
 
 // ---------- Кино ----------
-const adminMovie = (m: any) => ({ ...movieDetail(m), isPublished: m.isPublished, videoError: m.videoError, videoProgress: m.videoProgress, createdAt: m.createdAt, updatedAt: m.updatedAt });
+const adminMovie = (m: any) => ({ ...movieDetail(m), isPublished: m.isPublished, videoError: m.videoError, videoProgress: m.videoProgress, videoUploadSeconds: m.videoUploadSeconds, videoProcessSeconds: m.videoProcessSeconds, createdAt: m.createdAt, updatedAt: m.updatedAt });
 
 export async function listMovies(req: Request, res: Response) {
   const q = parse(pageQuery.extend({ q: z.string().trim().max(100).optional(), published: z.enum(['true', 'false']).optional() }), req.query);

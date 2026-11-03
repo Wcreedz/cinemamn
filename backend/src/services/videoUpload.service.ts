@@ -34,6 +34,10 @@ export const VideoUploadService = {
     const fileKey = `${input.fileName}|${input.size}|${input.lastModified}`;
     const existing = await VideoUpload.findOne({ movieId, fileKey, status: 'uploading' }).lean();
     if (existing && await fs.access(existing.tempPath).then(() => true, () => false)) {
+      // Сүүлийн хэсэг ирснээс хойшхи завсрыг тоолохгүй.
+      // startedAt-гүй нь энэ хувилбараас өмнө эхэлсэн байршуулалт.
+      const lastActive = existing.startedAt && existing.updatedAt ? existing.updatedAt.getTime() - existing.startedAt.getTime() : 0;
+      await VideoUpload.updateOne({ _id: existing._id }, { $inc: { activeMs: Math.max(0, lastActive) }, $set: { startedAt: new Date() } });
       return { uploadId: String(existing._id), chunkSize: existing.chunkSize, received: existing.received };
     }
     await discard({ movieId });
@@ -93,6 +97,8 @@ export const VideoUploadService = {
     try {
       const job = await VideoService.enqueue(movieId, upload.tempPath);
       await VideoUpload.updateOne({ _id: uploadId }, { $set: { jobId: job._id } });
+      const videoUploadSeconds = Math.round(((upload.activeMs ?? 0) + Date.now() - (upload.startedAt ?? upload.updatedAt ?? new Date()).getTime()) / 1000);
+      await Movie.updateOne({ _id: movieId }, { $set: { videoUploadSeconds }, $unset: { videoProcessSeconds: 1 } });
       return { jobId: String(job._id), size: upload.size };
     } catch (err) {
       await VideoUpload.updateOne({ _id: uploadId }, { $set: { status: 'uploading' } });

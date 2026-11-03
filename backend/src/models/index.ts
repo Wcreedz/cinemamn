@@ -71,6 +71,8 @@ const movieSchema = new Schema({
   videoStatus: { type: String, enum: ['none', 'uploading', 'queued', 'processing', 'ready', 'failed'], default: 'none' },
   videoError: String,
   videoProgress: { type: Number, min: 0, max: 100 },
+  videoUploadSeconds: Number,
+  videoProcessSeconds: Number,
   duration: { type: Number, min: 0 },
   releaseYear: { type: Number, min: 1888, max: 2100 },
   genres: [ref('Category')],
@@ -236,6 +238,10 @@ const videoUploadSchema = new Schema({
   chunkSize: { type: Number, required: true },
   tempPath: { type: String, required: true },
   received: { type: [Number], default: [] },
+  // Завсарласан хугацааг байршуулалтын хугацаанд оруулахгүй.
+  startedAt: { type: Date, default: Date.now },
+  activeMs: { type: Number, default: 0 },
+  updatedAt: Date,
   status: { type: String, enum: ['uploading', 'completed'], default: 'uploading' },
   jobId: ref('VideoJob'),
 }, opts('video_uploads'));

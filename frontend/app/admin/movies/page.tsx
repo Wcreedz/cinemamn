@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { AdminMovie, Paginated } from '@mongolflix/shared';
-import { VideoBadge, videoErrorText } from '@/components/admin/movie-form';
+import { VideoBadge, VideoTimes, videoErrorText } from '@/components/admin/movie-form';
 import { PageHeader, Pager, Table } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Badge, Banner, EmptyState, ErrorState, Skeleton } from '@/components/ui
 import { useApi } from '@/hooks/use-api';
 
 const POLL_MS = 5000;
-const PROCESSING_NOTE = 'Кино боловсруулагдаж байна: хуудсаа хаасан ч үргэлжилнэ, дуусмагц "Бэлэн" болно.';
+const PROCESSING_NOTE = 'Файл серверт хүрлээ. Боловсруулалтын явцыг доорх жагсаалтаас харна уу: хуудсаа хаасан ч үргэлжилнэ.';
 const NOTICES: Record<string, string> = {
   created: 'Кино нэмэгдлээ.',
   saved: 'Хадгалагдлаа.',
@@ -59,7 +59,7 @@ export default function AdminMovies() {
               <tr key={m.id}>
                 <td className="px-4 py-3"><Link href={`/admin/movies/${m.id}`} className="font-semibold text-primary hover:underline">{m.title}</Link>{m.featured && <Badge tone="primary" className="ml-2">Онцлох</Badge>}</td>
                 <td className="px-4 py-3"><Badge tone={m.isPublished ? 'success' : 'neutral'}>{m.isPublished ? 'Нийтлэгдсэн' : 'Ноорог: сайтад харагдахгүй'}</Badge></td>
-                <td className="px-4 py-3"><VideoBadge movie={m} />{m.videoError && <p className="mt-1 max-w-xs text-xs font-medium text-destructive">{videoErrorText(m.videoError)}</p>}</td>
+                <td className="px-4 py-3"><VideoBadge movie={m} /><VideoTimes movie={m} />{m.videoError && <p className="mt-1 max-w-xs text-xs font-medium text-destructive">{videoErrorText(m.videoError)}</p>}</td>
                 <td className="px-4 py-3">{m.viewCount}</td>
               </tr>
             ))}

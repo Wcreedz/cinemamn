@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { promises as fs } from 'fs';
+import { Types } from 'mongoose';
 import { env } from '../src/config/env';
 import { Movie, VideoJob, VideoUpload } from '../src/models';
 import { VideoUploadService } from '../src/services/videoUpload.service';
@@ -58,6 +59,23 @@ describe('Видео хэсэгчлэн байршуулах', () => {
     const again = await agent.post(`${base}/start`).send(FILE);
     expect(again.body.uploadId).toBe(start.uploadId);
     expect(again.body.received).toEqual([1]);
+  });
+
+  it('байршуулалтын хугацаанд завсарласан хугацаа орохгүй, шинэ файл хуучин хугацааг цэвэрлэнэ', async () => {
+    const { movie, base, agent, start, send, complete } = await begin();
+    await Movie.updateOne({ _id: movie._id }, { $set: { videoProcessSeconds: 999 } });
+    await send(0, bytes(CHUNK, 1));
+    // 10 минут ажиллаад 5 цаг завсарласан.
+    const now = Date.now();
+    await VideoUpload.collection.updateOne({ _id: new Types.ObjectId(start.uploadId) }, { $set: { startedAt: new Date(now - 5 * 3600_000 - 600_000), updatedAt: new Date(now - 5 * 3600_000) } });
+    await agent.post(`${base}/start`).send(FILE);
+    await send(1, bytes(CHUNK, 2));
+    await send(2, bytes(100, 3));
+    expect((await complete()).status).toBe(202);
+    const after = (await Movie.findById(movie._id).lean())!;
+    expect(after.videoUploadSeconds).toBeGreaterThanOrEqual(600);
+    expect(after.videoUploadSeconds).toBeLessThan(660);
+    expect(after.videoProcessSeconds).toBeUndefined();
   });
 
   it('ижил хэсгийг давтан илгээхэд эвдрэхгүй', async () => {

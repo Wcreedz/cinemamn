@@ -35,6 +35,24 @@ export function VideoBadge({ movie }: { movie: Pick<AdminMovie, 'videoStatus' | 
   );
 }
 
+const spent = (seconds: number) => {
+  if (seconds < 60) return `${Math.max(1, Math.round(seconds))} сек`;
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `${minutes} мин` : `${Math.floor(minutes / 60)} цаг ${minutes % 60} мин`;
+};
+
+// Байршуулах (админы хөтчөөс сервер рүү), боловсруулах (сервер дээрх FFmpeg) нь тусдаа ажил.
+export function VideoTimes({ movie }: { movie: Pick<AdminMovie, 'videoUploadSeconds' | 'videoProcessSeconds'> }) {
+  const { videoUploadSeconds: upload, videoProcessSeconds: processing } = movie;
+  if (upload === undefined && processing === undefined) return null;
+  return (
+    <p className="mt-1 text-xs text-muted-foreground">
+      {upload !== undefined && <span className="block">Байршуулсан: {spent(upload)}</span>}
+      {processing !== undefined && <span className="block">Боловсруулсан: {spent(processing)}</span>}
+    </p>
+  );
+}
+
 const chunkBytes = (index: number, chunkSize: number, size: number) => Math.min(chunkSize, size - index * chunkSize);
 
 // Диск дүүрэх, FFmpeg алга байх зэргийг давтаад нэмэргүй: шалтгааныг нь шууд харуулна.
@@ -61,33 +79,33 @@ interface SaveTask { steps: string[]; current: number; upload: UploadState | nul
 
 const duration = (seconds: number) => (seconds < 60 ? `~${Math.ceil(seconds)} сек үлдсэн` : seconds < 3600 ? `~${Math.ceil(seconds / 60)} мин үлдсэн` : `~${(seconds / 3600).toFixed(1)} цаг үлдсэн`);
 
-// Хадгалалт, файл байршуулалтын аль шатанд явааг хаасан цонхоор харуулж, давхар дарахаас сэргийлнэ.
+// Хадгалалт, файл байршуулалтын аль шатанд явааг "Кино файл" хэсэгт шууд харуулна.
 function SaveProgress({ task }: { task: SaveTask }) {
   const { upload } = task;
   const percent = upload ? Math.floor((upload.loaded / upload.total) * 100) : null;
   const left = upload && upload.speed > 0 ? (upload.total - upload.loaded) / upload.speed : null;
   return (
-    <div role="status" aria-live="polite" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md space-y-4 rounded-xl bg-card p-6 text-card-foreground shadow-lg">
-        <ul className="space-y-3">
-          {task.steps.map((step, i) => (
-            <li key={step} className={`flex items-center gap-3 text-sm font-semibold ${i > task.current ? 'text-muted-foreground' : ''}`}>
-              {i < task.current ? <Check className="size-5 shrink-0 text-success" aria-hidden /> : i === task.current ? <Loader2 className="size-5 shrink-0 animate-spin text-primary" aria-hidden /> : <span className="size-5 shrink-0 rounded-full border-2" aria-hidden />}
-              {step}
-            </li>
-          ))}
-        </ul>
-        {upload && percent !== null && (
-          <div className="space-y-1">
-            <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-[width]" style={{ width: `${percent}%` }} /></div>
-            {upload.loaded >= upload.total
-              ? <p className="text-xs text-muted-foreground">Сервер файлыг хүлээн авч байна…</p>
-              : <p className="text-xs text-muted-foreground">{percent}% · {fileSize(upload.loaded)} / {fileSize(upload.total)}{upload.speed > 0 ? ` · ${(upload.speed / 1024 ** 2).toFixed(1)} MB/с` : ''}{left !== null ? ` · ${duration(left)}` : ''}</p>}
+    <div role="status" aria-live="polite" className="space-y-3 rounded-lg border p-4">
+      <ul className="space-y-2">
+        {task.steps.map((step, i) => (
+          <li key={step} className={`flex items-center gap-3 text-sm font-semibold ${i > task.current ? 'text-muted-foreground' : ''}`}>
+            {i < task.current ? <Check className="size-5 shrink-0 text-success" aria-hidden /> : i === task.current ? <Loader2 className="size-5 shrink-0 animate-spin text-primary" aria-hidden /> : <span className="size-5 shrink-0 rounded-full border-2" aria-hidden />}
+            {step}
+          </li>
+        ))}
+      </ul>
+      {upload && percent !== null && (
+        <div className="space-y-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-2xl font-black tabular-nums text-primary">{percent}%</span>
+            {upload.loaded < upload.total && <span className="text-xs text-muted-foreground">{fileSize(upload.loaded)} / {fileSize(upload.total)}{upload.speed > 0 ? ` · ${(upload.speed / 1024 ** 2).toFixed(1)} MB/с` : ''}{left !== null ? ` · ${duration(left)}` : ''}</span>}
           </div>
-        )}
-        {task.warning && <Notice tone="warning" className="font-semibold">{task.warning}</Notice>}
-        <p className="text-xs text-muted-foreground">Дуустал хуудсаа битгий хаагаарай.</p>
-      </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-[width]" style={{ width: `${percent}%` }} /></div>
+          {upload.loaded >= upload.total && <p className="text-xs text-muted-foreground">Сервер файлыг хүлээн авч байна…</p>}
+        </div>
+      )}
+      {task.warning && <Notice tone="warning" className="font-semibold">{task.warning}</Notice>}
+      <p className="text-xs text-muted-foreground">Дуустал хуудсаа битгий хаагаарай.</p>
     </div>
   );
 }
@@ -147,10 +165,13 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   const [images, setImages] = useState<{ poster: File | null; backdrop: File | null }>({ poster: null, backdrop: null });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const banner = useRef<HTMLDivElement>(null);
+  const filePanel = useRef<HTMLDivElement>(null);
   // Урт маягтын доор байсан ч үр дүн нүдэнд шууд өртөнө.
   useEffect(() => { if (msg) banner.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, [msg]);
   const [task, setTask] = useState<SaveTask | null>(null);
   const busy = task !== null;
+  // Утсанд товч хуудасны доор байдаг: явц шинэчлэгдсэн байрлалдаа харагдах ёстой.
+  useEffect(() => { if (busy) filePanel.current?.scrollIntoView({ block: 'start' }); }, [busy]);
   const set =<K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) => setF((s) => ({ ...s, [k]: v }));
 
   // Том файл дамжуулж байхад хуудас хаагдвал байршуулалт тасарна.
@@ -275,18 +296,20 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   const processing = movie?.videoStatus === 'queued' || movie?.videoStatus === 'processing';
 
   return (
-    <form onSubmit={(e) => void save(e)} className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-      {task && <SaveProgress task={task} />}
+    <form onSubmit={(e) => void save(e)}>
+      <fieldset disabled={busy} className="grid min-w-0 gap-6 xl:grid-cols-[2fr_1fr]">
       {msg && <div ref={banner} className="xl:col-span-2"><Banner tone={msg.ok ? 'success' : 'danger'} title={msg.ok ? 'Амжилттай' : 'Амжилтгүй боллоо'}>{msg.text}</Banner></div>}
-      <div className="min-w-0 space-y-6">
+      <div ref={filePanel} className="min-w-0 scroll-mt-20 space-y-6">
         <Panel className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-bold">Кино файл</h2>
             {movie && <VideoBadge movie={movie} />}
           </div>
+          {movie && <VideoTimes movie={movie} />}
           <FilePicker large label={movie?.videoStatus === 'ready' ? 'Киног солих бол шинэ файл сонгоно уу' : 'Энд дарж кино файлаа сонгоно уу'} accept="video/*,.mkv" file={video} disabled={busy} onPick={setVideo} />
           <p className="text-xs text-muted-foreground">MP4, MKV, MOV, WEBM, AVI. Файл сонгосны дараа доорх мэдээллийг бөглөөд &quot;{movie ? 'Хадгалах' : 'Кино нэмэх'}&quot; товчийг дарна.</p>
-          {processing &&<Notice>Кино боловсруулагдаж байна. Хуудсаа хаасан ч үргэлжилнэ, дуусмагц &quot;Бэлэн&quot; болно.</Notice>}
+          {task && <SaveProgress task={task} />}
+          {processing && <Notice>Кино боловсруулагдаж байна. Хуудсаа хаасан ч үргэлжилнэ, дуусмагц &quot;Бэлэн&quot; болно.</Notice>}
           {current?.videoError && <Banner tone="danger" title="Кино боловсруулж чадсангүй">{videoErrorText(current.videoError)}</Banner>}
           {current?.videoRetryable && <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => void retryVideo()}>Дахин боловсруулах</Button>}
         </Panel>
@@ -319,6 +342,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
           <ImageField label="Арын зураг" src={f.backdrop} file={images.backdrop} disabled={busy} previewClass="h-24" onPick={(file) => setImages((s) => ({ ...s, backdrop: file }))} />
         </Panel>
       </div>
+      </fieldset>
     </form>
   );
 }
