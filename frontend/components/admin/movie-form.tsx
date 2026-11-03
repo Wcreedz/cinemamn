@@ -300,12 +300,12 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
           {movie && <VideoTimes movie={movie} />}
           {hasVideo ? <p className="text-xs text-muted-foreground">Кино файл орсон байна. Өөр файл оруулах бол киног жагсаалтаас устгаад шинээр бүртгэнэ үү.</p> : (
             <>
-              <FilePicker large label={resumable ? `Үргэлжлүүлэх бол "${resumable.fileName}" файлаа сонгоно уу` : 'Энд дарж кино файлаа сонгоно уу'} accept="video/*,.mkv" file={video} disabled={busy} onPick={setVideo} />
+              <FilePicker large label={resumable ? `Үргэлжлүүлэх бол "${resumable.fileName}" файлаа сонгоно уу` : 'Энд дарж кино файлаа сонгоно уу'} accept="video/*,.mkv,.ts" file={video} disabled={busy} onPick={setVideo} />
               {video && resumable && !task && (video.name === resumable.fileName
                 ? <Notice tone="success">Хадгалах дарвал {resumable.percent}%-иас үргэлжилнэ.</Notice>
                 : <Notice tone="warning">Өөр файл сонгосон тул өмнө орсон {resumable.percent}% устаж, эхнээс нь орно.</Notice>)}
               {video && !task && <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setVideo(null)}>Сонгосон файлыг болих</Button>}
-              <p className="text-xs text-muted-foreground">MP4, MKV, MOV, WEBM, AVI. Файл сонгосны дараа &quot;{movie ? 'Хадгалах' : 'Кино нэмэх'}&quot; товчийг дарна.</p>
+              <p className="text-xs text-muted-foreground">MP4, MKV, MOV, WEBM, AVI, TS. Файл сонгосны дараа &quot;{movie ? 'Хадгалах' : 'Кино нэмэх'}&quot; товчийг дарна.</p>
             </>
           )}
           {task && <SaveProgress task={task} />}

@@ -8,7 +8,7 @@ import { VideoConfigurationService } from './videoConfiguration.service';
 
 // Нэг хүсэлтийн хэмжээ: Vercel-ийн прокси, түүний 120 секундын хязгаарт багтахаар бага байна.
 export const CHUNK_BYTES = 3 * 1024 * 1024;
-const VIDEO_EXTS = new Set(['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v']);
+const VIDEO_EXTS = new Set(['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v', '.ts']);
 const ABANDONED_MS = 7 * 24 * 60 * 60 * 1000;
 // Клиент тасалдсан хэсгийг ~1.5 минут давтдаг: үүнээс удаан чимээгүй бол зогссон гэж харуулна.
 const STALLED_MS = 3 * 60 * 1000;
@@ -30,7 +30,7 @@ export const VideoUploadService = {
   async start(movieId: string, input: StartInput) {
     if (!(await Movie.exists({ _id: movieId }))) throw notFound('Кино олдсонгүй.');
     const ext = path.extname(input.fileName).toLowerCase();
-    if (!VIDEO_EXTS.has(ext)) throw badRequest('Зөвхөн видео файл (mp4, mkv, mov, webm, avi) байршуулна.');
+    if (!VIDEO_EXTS.has(ext)) throw badRequest('Зөвхөн видео файл (mp4, mkv, mov, webm, avi, ts) байршуулна.');
     await VideoService.checkTools();
 
     const fileKey = `${input.fileName}|${input.size}|${input.lastModified}`;

@@ -139,6 +139,20 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     expect((seg.body as Buffer)[0]).toBe(0x47); // MPEG-TS sync byte
   });
 
+  it('.ts файл хүлээн авч, боловсруулж, үзэх боломжтой болно', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    const file = path.join(env.VIDEO_DEFAULT_ROOT, 'sample.ts');
+    await run(env.FFMPEG_PATH, ['-y', '-i', path.join(env.VIDEO_DEFAULT_ROOT, 'sample.mp4'), '-c', 'copy', '-f', 'mpegts', file]);
+    expect((await uploadVideo(admin.agent, movie._id, await fs.readFile(file), 'Мафийн Гүнж.ts')).status).toBe(202);
+    await VideoService.process((await VideoService.claimNext())!);
+    const after = await Movie.findById(movie._id).select('+videoSource +hlsPath').lean();
+    expect(after!.videoStatus).toBe('ready');
+    expect(Math.round(after!.duration!)).toBe(4);
+    expect(after!.videoSource).toMatch(/\.ts$/);
+    await fs.access(path.join(env.VIDEO_DEFAULT_ROOT, 'hls', String(movie._id), 'master.m3u8'));
+  });
+
   it('эргүүлэх тэмдэгтэй утасны бичлэг сунгагдахгүй, босоо хэвээр гарна', async () => {
     const movie = await makeMovie({ videoStatus: 'none' });
     const admin = await login('admin');
