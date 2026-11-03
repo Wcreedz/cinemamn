@@ -14,6 +14,6 @@
 
 **Нийтийн тохиргоо**: `GET /api/settings/public`
 
-**Админ** (`/api/admin`, admin эрх): `dashboard`, `users`, `users/:id`, `users/:id/status`, `users/:id/password`, `movies` CRUD, `movies/:id/upload/start`, `movies/:id/upload/:uploadId/chunks/:index`, `movies/:id/upload/:uploadId/complete`, `movies/:id/image?kind=`, `video-jobs`, `categories` CRUD, `payments`, `payments/:id/verify`, `payments/:id/refund` (superadmin), `subscriptions`, `subscriptions/:userId/extend`, `logs`, `admins` (superadmin)
+**Админ** (`/api/admin`, admin эрх): `dashboard`, `users`, `users/:id`, `users/:id/status`, `users/:id/password`, `movies` CRUD, `movies/:id/upload/start`, `movies/:id/upload/:uploadId/chunks/:index`, `movies/:id/upload/:uploadId/complete`, `movies/:id/image?kind=`, `video-jobs`, `categories` CRUD, `categories/:id/image`, `banners/image`, `payments`, `payments/:id/verify`, `payments/:id/refund` (superadmin), `subscriptions`, `subscriptions/:userId/extend`, `logs`, `admins` (superadmin)
 
 **Тохиргоо**: `GET /api/admin/settings`, `PUT /api/admin/settings { section, value }`, `PUT /api/admin/settings/{general|subscription|video|security|homepage} { value, expectedVersion? }`, `GET /api/admin/settings/history`

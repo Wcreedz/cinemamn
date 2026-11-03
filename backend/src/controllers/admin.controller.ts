@@ -1,12 +1,11 @@
 import type { Request, Response } from 'express';
 import { promises as fs } from 'fs';
-import multer from 'multer';
 import path from 'path';
-import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { AdminLog, Category, IPayment, ISubscription, Movie, Payment, Subscription, User, VideoJob, WatchHistory } from '../models';
 import { logAdmin } from '../services/adminLog.service';
+import { MediaService, withoutEmpty } from '../services/media.service';
 import { AuthService, hashPassword } from '../services/auth.service';
 import { PaymentService } from '../services/payment.service';
 import { SubscriptionService } from '../services/subscription.service';
@@ -147,7 +146,7 @@ export async function setAdminRole(req: Request, res: Response) {
 }
 
 // ---------- Кино ----------
-const adminMovie = (m: any) => ({ ...movieDetail(m), isPublished: m.isPublished, videoError: m.videoError, videoProgress: m.videoProgress, videoUploadSeconds: m.videoUploadSeconds, videoProcessSeconds: m.videoProcessSeconds, createdAt: m.createdAt, updatedAt: m.updatedAt });
+const adminMovie = (m: any) => ({ ...movieDetail(m), videoPlayable: !!m.hlsPath, isPublished: m.isPublished, videoError: m.videoError, videoProgress: m.videoProgress, videoUploadSeconds: m.videoUploadSeconds, videoProcessSeconds: m.videoProcessSeconds, createdAt: m.createdAt, updatedAt: m.updatedAt });
 
 export async function listMovies(req: Request, res: Response) {
   const q = parse(pageQuery.extend({ q: z.string().trim().max(100).optional(), published: z.enum(['true', 'false']).optional() }), req.query);
@@ -155,7 +154,7 @@ export async function listMovies(req: Request, res: Response) {
   if (q.q) filter.title = { $regex: escapeRegex(q.q), $options: 'i' };
   if (q.published) filter.isPublished = q.published === 'true';
   const [items, total] = await Promise.all([
-    Movie.find(filter).populate('genres').sort(sortFrom(q.sort, ['createdAt', 'title', 'viewCount'], '-createdAt')).skip((q.page - 1) * q.limit).limit(q.limit).lean(),
+    Movie.find(filter).select('+hlsPath').populate('genres').sort(sortFrom(q.sort, ['createdAt', 'title', 'viewCount'], '-createdAt')).skip((q.page - 1) * q.limit).limit(q.limit).lean(),
     Movie.countDocuments(filter),
   ]);
   res.json(paged(items.map(adminMovie), total, q.page, q.limit));
@@ -163,7 +162,7 @@ export async function listMovies(req: Request, res: Response) {
 
 export async function getMovie(req: Request, res: Response) {
   const id = idParam(req);
-  const m = await Movie.findById(id).populate('genres').lean();
+  const m = await Movie.findById(id).select('+hlsPath').populate('genres').lean();
   if (!m) throw notFound('Кино олдсонгүй.');
   const videoRetryable = !!(await VideoJob.exists({ movieId: id, status: 'failed', retryable: true }));
   res.json({ ...adminMovie(m), videoRetryable });
@@ -196,16 +195,18 @@ async function createWithUniqueSlug(input: z.infer<typeof movieInput>) {
 }
 
 export async function createMovie(req: Request, res: Response) {
-  const m = await createWithUniqueSlug(parse(movieInput, req.body));
+  const m = await createWithUniqueSlug(withoutEmpty(parse(movieInput, req.body), ['poster', 'backdrop']).$set);
   await logAdmin(req, 'movie.create', { type: 'Movie', id: m._id }, { title: m.title });
-  res.status(201).json(adminMovie((await Movie.findById(m._id).populate('genres').lean())!));
+  res.status(201).json(adminMovie((await Movie.findById(m._id).select('+hlsPath').populate('genres').lean())!));
 }
 
 export async function updateMovie(req: Request, res: Response) {
   const id = idParam(req);
   const b = parse(movieInput, req.body);
-  const m = await Movie.findByIdAndUpdate(id, { $set: b }, { new: true, runValidators: true }).populate('genres').lean();
+  const before = await Movie.findById(id).select('poster backdrop').lean();
+  const m = await Movie.findByIdAndUpdate(id, withoutEmpty(b, ['poster', 'backdrop']), { new: true, runValidators: true }).select('+hlsPath').populate('genres').lean();
   if (!m) throw notFound('Кино олдсонгүй.');
+  await MediaService.removeUnused([before?.poster, before?.backdrop], [m.poster, m.backdrop]);
   await logAdmin(req, 'movie.update', { type: 'Movie', id }, { title: m.title, isPublished: m.isPublished, featured: m.featured });
   res.json(adminMovie(m));
 }
@@ -219,6 +220,8 @@ export async function deleteMovie(req: Request, res: Response) {
   await fs.rm(path.join(dirs.hls, String(id)), { recursive: true, force: true });
   if (m.videoSource) await fs.rm(m.videoSource, { force: true });
   await VideoUploadService.discardForMovie(String(id));
+  await VideoService.discardForMovie(String(id));
+  await MediaService.removeUnused([m.poster, m.backdrop]);
   await WatchHistory.deleteMany({ movieId: id });
   await logAdmin(req, 'movie.delete', { type: 'Movie', id }, { title: m.title });
   res.json({ ok: true });
@@ -246,32 +249,13 @@ export async function completeVideoUpload(req: Request, res: Response) {
   res.status(202).json({ jobId, videoStatus: 'queued' });
 }
 
-// Гарчгаас биш файлын эхний байтаас зургийн төрлийг тодорхойлно.
-function imageExt(buf: Buffer) {
-  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return '.jpg';
-  if (buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return '.png';
-  if (buf.length > 12 && buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP') return '.webp';
-  return null;
-}
-
 export async function uploadImage(req: Request, res: Response) {
   const id = idParam(req);
   const { kind } = parse(z.object({ kind: z.enum(['poster', 'backdrop']) }), req.query);
   if (!(await Movie.exists({ _id: id }))) throw notFound('Кино олдсонгүй.');
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 } }).single('image');
-  await new Promise<void>((resolve, reject) => upload(req, res, (err) => (err ? reject(err) : resolve())));
-  if (!req.file) throw badRequest('Зураг сонгоно уу.');
-  const ext = imageExt(req.file.buffer);
-  if (!ext) throw badRequest('Зөвхөн JPG, PNG, WEBP зураг байршуулна.');
-  const { storageRoot } = await VideoConfigurationService.get();
-  const dirs = VideoConfigurationService.dirs(storageRoot);
-  const folder = kind === 'poster' ? 'posters' : 'backdrops';
-  await fs.mkdir(dirs[folder], { recursive: true });
-  const name = `${id}-${crypto.randomBytes(4).toString('hex')}${ext}`;
-  await fs.writeFile(path.join(dirs[folder], name), req.file.buffer);
-  // Харьцангуй зам: домэйн солигдох, HTTPS руу шилжихэд зураг эвдрэхгүй.
-  const url = `/media/${folder}/${name}`;
-  await Movie.updateOne({ _id: id }, { $set: { [kind]: url } });
+  const url = await MediaService.saveImage(req, res, kind);
+  const before = await Movie.findByIdAndUpdate(id, { $set: { [kind]: url } }).lean();
+  await MediaService.removeUnused([before?.[kind]], [url]);
   await logAdmin(req, `movie.${kind}_upload`, { type: 'Movie', id });
   res.json({ url });
 }
@@ -281,23 +265,41 @@ export async function listCategories(_req: Request, res: Response) {
   res.json({ items: (await Category.find().sort({ sortOrder: 1 }).lean()).map((c: any) => ({ id: String(c._id), name: c.name, slug: c.slug, description: c.description, image: c.image, sortOrder: c.sortOrder, isActive: c.isActive })) });
 }
 export async function createCategory(req: Request, res: Response) {
-  const c = await Category.create(parse(categoryInput, req.body));
+  const c = await Category.create(withoutEmpty(parse(categoryInput, req.body), ['image']).$set);
   await logAdmin(req, 'category.create', { type: 'Category', id: c._id }, { name: c.name });
   res.status(201).json({ id: String(c._id) });
 }
 export async function updateCategory(req: Request, res: Response) {
   const id = idParam(req);
-  const c = await Category.findByIdAndUpdate(id, { $set: parse(categoryInput, req.body) }, { new: true, runValidators: true });
+  const before = await Category.findById(id).select('image').lean();
+  const c = await Category.findByIdAndUpdate(id, withoutEmpty(parse(categoryInput, req.body), ['image']), { new: true, runValidators: true });
   if (!c) throw notFound('Ангилал олдсонгүй.');
+  await MediaService.removeUnused([before?.image], [c.image]);
   await logAdmin(req, 'category.update', { type: 'Category', id }, { name: c.name });
   res.json({ id: String(c._id) });
 }
 export async function deleteCategory(req: Request, res: Response) {
   const id = idParam(req);
   if (await Movie.exists({ genres: id })) throw conflict('Энэ ангилалд кино холбогдсон байна.');
-  await Category.deleteOne({ _id: id });
+  const c = await Category.findByIdAndDelete(id).lean();
+  await MediaService.removeUnused([c?.image]);
   await logAdmin(req, 'category.delete', { type: 'Category', id });
   res.json({ ok: true });
+}
+export async function uploadCategoryImage(req: Request, res: Response) {
+  const id = idParam(req);
+  if (!(await Category.exists({ _id: id }))) throw notFound('Ангилал олдсонгүй.');
+  const url = await MediaService.saveImage(req, res, 'category');
+  const before = await Category.findByIdAndUpdate(id, { $set: { image: url } }).lean();
+  await MediaService.removeUnused([before?.image], [url]);
+  await logAdmin(req, 'category.image_upload', { type: 'Category', id });
+  res.json({ url });
+}
+
+// ---------- Нүүр хуудасны зураг ----------
+// Тохиргоо хадгалагдах үед л хэрэглэгдэнэ. Хасагдсан зургийг settings.controller устгана.
+export async function uploadBannerImage(req: Request, res: Response) {
+  res.json({ url: await MediaService.saveImage(req, res, 'banner') });
 }
 
 // ---------- Төлбөр ----------

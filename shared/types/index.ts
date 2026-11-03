@@ -24,7 +24,7 @@ export interface MovieDetail extends MovieSummary {
   originalTitle?: string; trailerUrl?: string; cast: string[]; director?: string; language?: string; country?: string;
   videoStatus: VideoStatus;
 }
-export interface AdminMovie extends MovieDetail { isPublished: boolean; videoError?: string; videoProgress?: number; videoUploadSeconds?: number; videoProcessSeconds?: number; videoRetryable?: boolean; hlsPath?: string; createdAt: string; updatedAt: string }
+export interface AdminMovie extends MovieDetail { isPublished: boolean; videoError?: string; videoProgress?: number; videoUploadSeconds?: number; videoProcessSeconds?: number; videoRetryable?: boolean; videoPlayable: boolean; createdAt: string; updatedAt: string }
 
 export interface Plan { code: string; name: string; price: number; currency: string; durationDays: number; enabled: boolean }
 export interface PlansResponse { enabled: boolean; paymentRequired: boolean; currency: string; plans: Plan[]; version: number }
@@ -42,10 +42,11 @@ export interface PaymentView {
 }
 
 export interface HeroBanner { title: string; subtitle?: string; image?: string; link?: string; enabled: boolean }
+export interface AdBanner { image: string; link?: string; enabled: boolean }
 export interface HomeSection { key: string; title: string; type: 'new' | 'popular' | 'continue' | 'category'; categorySlug?: string; visible: boolean; order: number }
 export interface PublicSettings {
   general: { siteName: string; logo?: string; favicon?: string; description: string; maintenanceMode: boolean };
-  homepage: { heroBanners: HeroBanner[]; featuredMovieIds: string[]; sections: HomeSection[] };
+  homepage: { heroBanners: HeroBanner[]; adBanners: AdBanner[]; featuredMovieIds: string[]; sections: HomeSection[] };
   subscription: { enabled: boolean; paymentRequired: boolean; currency: string };
 }
 

@@ -2,8 +2,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Check, Film, ImageIcon, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import type { AdminMovie, Category } from '@mongolflix/shared';
+import { BACKDROP_MAX_SIDE, fileSize, FilePicker, ImageField, POSTER_MAX_SIDE, uploadImageFile } from '@/components/admin/image-field';
 import { Field, Panel } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
@@ -11,15 +12,12 @@ import { Badge, Banner, Notice } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
 import { useApi } from '@/hooks/use-api';
 import { api, ApiClientError } from '@/lib/api';
-import { compressImage } from '@/lib/compress-image';
 
 const VIDEO_LABELS: Record<string, string> = { none: 'Видеогүй', uploading: 'Байршуулж байна', queued: 'Дараалалд', processing: 'Боловсруулж байна', ready: 'Бэлэн', failed: 'Алдаатай' };
 // Vercel-ээр дамжих зам тасалдаж болно: нэг хэсэг бүтэлгүйтвэл хүлээгээд давтана.
 const CHUNK_SENDERS = 4;
 const CHUNK_ATTEMPTS = 8;
 const MAX_BACKOFF_MS = 30_000;
-const POSTER_MAX_SIDE = 1200;
-const BACKDROP_MAX_SIDE = 1920;
 
 // Хуучин хувилбар хадгалсан англи бичиг: хэмжээний хязгаар одоо байхгүй.
 export const videoErrorText = (error: string) => (error === 'File too large' ? 'Өмнөх байршуулалт хэмжээний хязгаарт баригдсан. Одоо хязгааргүй тул файлаа дахин оруулна уу.' : error);
@@ -112,43 +110,7 @@ function SaveProgress({ task }: { task: SaveTask }) {
 
 const blank = { title: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true, featured: false };
 
-const fileSize = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`);
-
-// Зураг ачаалагдахгүй бол хоосон зай биш, шалтгааныг нь харуулна.
-function ImagePreview({ src, className }: { src: string; className: string }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => { setFailed(false); }, [src]);
-  if (failed) return <Notice tone="danger" className="mb-2 break-all">Зураг ачаалагдсангүй: {src}</Notice>;
-  return <img src={src} alt="" onError={() => setFailed(true)} className={`mb-2 rounded-md object-cover ${className}`} />;
-}
-
-function FilePicker({ label, accept, file, disabled, large, onPick }: { label: string; accept: string; file: File | null; disabled?: boolean; large?: boolean; onPick: (file: File) => void }) {
-  const Icon = large ? Film : ImageIcon;
-  return (
-    <label className={`flex cursor-pointer items-center justify-center gap-3 rounded-lg border-2 border-dashed text-center text-sm font-semibold transition-colors hover:border-primary hover:bg-accent focus-within:border-primary has-disabled:pointer-events-none has-disabled:opacity-50 ${large ? 'flex-col px-4 py-8' : 'px-3 py-3'} ${file ? 'border-primary bg-accent text-primary' : ''}`}>
-      <input type="file" accept={accept} className="sr-only" disabled={disabled} onChange={(e) => { const picked = e.target.files?.[0]; e.target.value = ''; if (picked) onPick(picked); }} />
-      <Icon className={large ? 'size-8' : 'size-5 shrink-0'} aria-hidden />
-      <span className="min-w-0 break-all">{file ? `${file.name} (${fileSize(file.size)})` : label}</span>
-    </label>
-  );
-}
-
-function ImageField({ label, src, file, disabled, previewClass, onPick }: { label: string; src: string; file: File | null; disabled: boolean; previewClass: string; onPick: (file: File) => void }) {
-  const [preview, setPreview] = useState<string | null>(null);
-  useEffect(() => {
-    if (!file) { setPreview(null); return; }
-    const url = URL.createObjectURL(file);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-  const shown = preview ?? src;
-  return (
-    <Field label={label}>
-      {shown && <ImagePreview src={shown} className={previewClass} />}
-      <FilePicker label="Зураг сонгох" accept="image/jpeg,image/png,image/webp" file={file} disabled={disabled} onPick={onPick} />
-    </Field>
-  );
-}
+export const deleteQuestion = (title: string) => `"${title}" киног бүрэн устгах уу? Кино файл, зураг, үзсэн түүх устаж, буцаах боломжгүй.`;
 
 export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?: () => void }) {
   const router = useRouter();
@@ -169,9 +131,11 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   // Урт маягтын доор байсан ч үр дүн нүдэнд шууд өртөнө.
   useEffect(() => { if (msg) banner.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, [msg]);
   const [task, setTask] = useState<SaveTask | null>(null);
-  const busy = task !== null;
+  const [deleting, setDeleting] = useState(false);
+  const saving = task !== null;
+  const busy = saving || deleting;
   // Утсанд товч хуудасны доор байдаг: явц шинэчлэгдсэн байрлалдаа харагдах ёстой.
-  useEffect(() => { if (busy) filePanel.current?.scrollIntoView({ block: 'start' }); }, [busy]);
+  useEffect(() => { if (saving) filePanel.current?.scrollIntoView({ block: 'start' }); }, [saving]);
   const set =<K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) => setF((s) => ({ ...s, [k]: v }));
 
   // Том файл дамжуулж байхад хуудас хаагдвал байршуулалт тасарна.
@@ -183,10 +147,12 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   }, [busy]);
 
   const uploadImage = async (id: string, kind: 'poster' | 'backdrop', file: File) => {
-    const form = new FormData();
-    form.append('image', await compressImage(file, kind === 'poster' ? POSTER_MAX_SIDE : BACKDROP_MAX_SIDE));
-    const r = await api<{ url: string }>(`/api/admin/movies/${id}/image?kind=${kind}`, { form });
-    set(kind, r.url);
+    set(kind, await uploadImageFile(`/api/admin/movies/${id}/image?kind=${kind}`, file, kind === 'poster' ? POSTER_MAX_SIDE : BACKDROP_MAX_SIDE));
+    setImages((s) => ({ ...s, [kind]: null }));
+  };
+
+  const removeImage = (kind: 'poster' | 'backdrop') => {
+    set(kind, '');
     setImages((s) => ({ ...s, [kind]: null }));
   };
 
@@ -240,7 +206,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     });
     const nextStep = () => setTask((t) => t && { ...t, current: t.current + 1 });
     const body = {
-      title: f.title, description: f.description, poster: f.poster || undefined, backdrop: f.backdrop || undefined,
+      title: f.title, description: f.description, poster: f.poster, backdrop: f.backdrop,
       trailerUrl: f.trailerUrl, genres: f.genres, isPublished: f.isPublished, featured: f.featured,
     };
     try {
@@ -284,16 +250,20 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   };
 
   const remove = async () => {
-    if (!movie || !window.confirm(`"${movie.title}" киног бүрэн устгах уу? Видео файлууд мөн устана.`)) return;
+    if (!movie || !window.confirm(deleteQuestion(movie.title))) return;
+    setDeleting(true);
     try {
       await api(`/api/admin/movies/${movie.id}`, { method: 'DELETE' });
-      router.push('/admin/movies');
+      router.push('/admin/movies?notice=deleted');
     } catch (err) {
+      setDeleting(false);
       setMsg({ ok: false, text: (err as Error).message });
     }
   };
 
   const processing = movie?.videoStatus === 'queued' || movie?.videoStatus === 'processing';
+  // Файл орсны дараа солихгүй: өөр файл оруулах бол киног устгаад шинээр бүртгэнэ.
+  const hasVideo = !!movie && (movie.videoPlayable || movie.videoStatus === 'ready' || processing);
 
   return (
     <form onSubmit={(e) => void save(e)}>
@@ -306,8 +276,13 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
             {movie && <VideoBadge movie={movie} />}
           </div>
           {movie && <VideoTimes movie={movie} />}
-          <FilePicker large label={movie?.videoStatus === 'ready' ? 'Киног солих бол шинэ файл сонгоно уу' : 'Энд дарж кино файлаа сонгоно уу'} accept="video/*,.mkv" file={video} disabled={busy} onPick={setVideo} />
-          <p className="text-xs text-muted-foreground">MP4, MKV, MOV, WEBM, AVI. Файл сонгосны дараа доорх мэдээллийг бөглөөд &quot;{movie ? 'Хадгалах' : 'Кино нэмэх'}&quot; товчийг дарна.</p>
+          {hasVideo ? <p className="text-xs text-muted-foreground">Кино файл орсон байна. Өөр файл оруулах бол киног жагсаалтаас устгаад шинээр бүртгэнэ үү.</p> : (
+            <>
+              <FilePicker large label="Энд дарж кино файлаа сонгоно уу" accept="video/*,.mkv" file={video} disabled={busy} onPick={setVideo} />
+              {video && !task && <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setVideo(null)}>Сонгосон файлыг болих</Button>}
+              <p className="text-xs text-muted-foreground">MP4, MKV, MOV, WEBM, AVI. Файл сонгосны дараа &quot;{movie ? 'Хадгалах' : 'Кино нэмэх'}&quot; товчийг дарна.</p>
+            </>
+          )}
           {task && <SaveProgress task={task} />}
           {processing && <Notice>Кино боловсруулагдаж байна. Хуудсаа хаасан ч үргэлжилнэ, дуусмагц &quot;Бэлэн&quot; болно.</Notice>}
           {current?.videoError && <Banner tone="danger" title="Кино боловсруулж чадсангүй">{videoErrorText(current.videoError)}</Banner>}
@@ -335,11 +310,11 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
           <label className="flex items-center justify-between gap-3 text-sm font-semibold">Онцлох<Switch checked={f.featured} onCheckedChange={(v) => set('featured', v)} /></label>
           <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Хадгалж байна…' : movie ? 'Хадгалах' : 'Кино нэмэх'}</Button>
           {movie && f.isPublished && <Button asChild variant="outline" className="w-full"><Link href={`/movies/${movie.slug}`} target="_blank">Урьдчилж харах</Link></Button>}
-          {movie && <Button type="button" variant="destructive" className="w-full" disabled={busy} onClick={() => void remove()}>Устгах</Button>}
+          {movie && <Button type="button" variant="destructive" className="w-full" disabled={busy} onClick={() => void remove()}>{deleting ? 'Устгаж байна…' : 'Киног устгах'}</Button>}
         </Panel>
         <Panel className="space-y-4">
-          <ImageField label="Постер" src={f.poster} file={images.poster} disabled={busy} previewClass="h-32" onPick={(file) => setImages((s) => ({ ...s, poster: file }))} />
-          <ImageField label="Арын зураг" src={f.backdrop} file={images.backdrop} disabled={busy} previewClass="h-24" onPick={(file) => setImages((s) => ({ ...s, backdrop: file }))} />
+          <ImageField label="Постер" src={f.poster} file={images.poster} disabled={busy} previewClass="h-32" onPick={(file) => setImages((s) => ({ ...s, poster: file }))} onRemove={() => removeImage('poster')} />
+          <ImageField label="Арын зураг" src={f.backdrop} file={images.backdrop} disabled={busy} previewClass="h-24" onPick={(file) => setImages((s) => ({ ...s, backdrop: file }))} onRemove={() => removeImage('backdrop')} />
         </Panel>
       </div>
       </fieldset>

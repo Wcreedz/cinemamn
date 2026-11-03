@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Info, Play } from 'lucide-react';
-import type { HomeSection, MovieSummary, Paginated, WatchHistoryItem } from '@mongolflix/shared';
+import type { AdBanner, HomeSection, MovieSummary, Paginated, WatchHistoryItem } from '@mongolflix/shared';
 import { Carousel } from '@/components/carousel';
+import { BannerLink, HeroSlider, type Slide } from '@/components/hero-slider';
 import { MovieCard } from '@/components/movie-card';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
@@ -11,41 +12,40 @@ import { EmptyState, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 
+const MOVIE_SLIDES = 5;
+
 function Hero() {
   const { settings } = useApp();
   const { data, loading } = useApi<{ items: MovieSummary[] }>('/api/movies/featured');
-  const banner = settings?.homepage.heroBanners[0];
+  const banners = settings?.homepage.heroBanners ?? [];
   const order = settings?.homepage.featuredMovieIds ?? [];
-  const items = data?.items ?? [];
-  const movie = items.find((m) => m.id === order[0]) ?? items[0];
-  if (loading) return <Skeleton className="-mx-4 h-[55vh] rounded-none md:mx-0 md:rounded-xl" />;
-  if (banner) {
-    return (
-      <section className="relative -mx-4 flex min-h-[50vh] items-end overflow-hidden bg-muted md:mx-0 md:rounded-xl">
-        {banner.image && <img src={banner.image} alt="" className="absolute inset-0 size-full object-cover" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-        <div className="relative max-w-xl p-6 md:p-10">
-          <h1 className="text-3xl font-black md:text-5xl">{banner.title}</h1>
-          {banner.subtitle && <p className="mt-3 text-sm text-gray-300 md:text-base">{banner.subtitle}</p>}
-          {banner.link && <Button asChild size="lg" className="mt-5"><Link href={banner.link}>Дэлгэрэнгүй</Link></Button>}
-        </div>
-      </section>
-    );
-  }
-  if (!movie) return null;
+  if (loading && !banners.length) return <Skeleton className="-mx-4 h-72 rounded-none md:mx-0 md:h-[60vh] md:min-h-80 md:rounded-xl" />;
+  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+  // Админ слайд нэмээгүй бол "Онцлох" кинонууд эргэлдэнэ.
+  const slides: Slide[] = banners.length
+    ? banners.map((b, i) => ({
+        key: `${i}-${b.image ?? b.title}`, image: b.image, title: b.title, text: b.subtitle, link: b.link,
+        actions: b.link && <Button asChild size="lg" className="mt-5"><BannerLink href={b.link}>Дэлгэрэнгүй</BannerLink></Button>,
+      }))
+    : [...(data?.items ?? [])].sort((a, b) => rank(a.id) - rank(b.id)).slice(0, MOVIE_SLIDES).map((m) => ({
+        key: m.id, image: m.backdrop || m.poster, title: m.title, text: m.description,
+        actions: (
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button asChild size="lg"><Link href={`/movies/${m.slug}`}><Play />Үзэх</Link></Button>
+            <Button asChild size="lg" variant="secondary"><Link href={`/movies/${m.slug}`}><Info />Дэлгэрэнгүй</Link></Button>
+          </div>
+        ),
+      }));
+  return <HeroSlider slides={slides} />;
+}
+
+function AdStrip({ ad }: { ad: AdBanner }) {
+  const image = <img src={ad.image} alt="Зар" loading="lazy" className="block h-auto w-full" />;
   return (
-    <section className="relative -mx-4 flex min-h-[55vh] items-end overflow-hidden bg-muted md:mx-0 md:rounded-xl">
-      {(movie.backdrop || movie.poster) && <img src={movie.backdrop || movie.poster} alt="" className="absolute inset-0 size-full object-cover" />}
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-      <div className="relative max-w-xl p-6 md:p-10">
-        <h1 className="text-3xl font-black md:text-5xl">{movie.title}</h1>
-        {movie.description && <p className="mt-3 line-clamp-3 text-sm text-gray-300 md:text-base">{movie.description}</p>}
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button asChild size="lg"><Link href={`/movies/${movie.slug}`}><Play />Үзэх</Link></Button>
-          <Button asChild size="lg" variant="secondary"><Link href={`/movies/${movie.slug}`}><Info />Дэлгэрэнгүй</Link></Button>
-        </div>
-      </div>
-    </section>
+    <aside aria-label="Зар" className="relative mt-8 overflow-hidden rounded-xl">
+      {ad.link ? <BannerLink href={ad.link} label="Зар">{image}</BannerLink> : image}
+      <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">Зар</span>
+    </aside>
   );
 }
 
@@ -83,12 +83,20 @@ export default function HomePage() {
   const { settings } = useApp();
   const { data, error, reload, loading } = useApi<Paginated<MovieSummary>>('/api/movies?limit=1');
   const sections = useMemo(() => (settings?.homepage.sections ?? []).filter((s) => s.visible).sort((a, b) => a.order - b.order), [settings]);
+  const ads = settings?.homepage.adBanners ?? [];
+  // Хоёр эгнээ тутамд нэг зар. Эгнээнээс илүү гарсан зар хамгийн доор.
   return (
     <>
       <Hero />
       {error && <div className="mt-8"><ErrorState message={error} onRetry={reload} /></div>}
       {!loading && !error && data?.total === 0 && <div className="mt-8"><EmptyState title="Одоогоор кино нэмэгдээгүй байна">Удахгүй шинэ кинонууд нэмэгдэнэ.</EmptyState></div>}
-      {sections.map((s) => <SectionRow key={s.key} section={s} />)}
+      {sections.map((s, i) => (
+        <Fragment key={s.key}>
+          <SectionRow section={s} />
+          {i % 2 === 1 && ads[(i - 1) / 2] && <AdStrip ad={ads[(i - 1) / 2]} />}
+        </Fragment>
+      ))}
+      {ads.slice(Math.floor(sections.length / 2)).map((ad) => <AdStrip key={ad.image} ad={ad} />)}
     </>
   );
 }

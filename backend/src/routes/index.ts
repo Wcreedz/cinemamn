@@ -88,6 +88,8 @@ a.get('/categories', admin.listCategories);
 a.post('/categories', admin.createCategory);
 a.put('/categories/:id', admin.updateCategory);
 a.delete('/categories/:id', admin.deleteCategory);
+a.post('/categories/:id/image', admin.uploadCategoryImage);
+a.post('/banners/image', admin.uploadBannerImage);
 a.get('/payments', admin.listPayments);
 a.post('/payments/:id/verify', admin.verifyPayment);
 a.post('/payments/:id/refund', admin.refundPayment);

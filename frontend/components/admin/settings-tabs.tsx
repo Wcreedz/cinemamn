@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { PublicUser } from '@mongolflix/shared';
+import type { AdminMovie, Paginated, PublicUser } from '@mongolflix/shared';
+import { BACKDROP_MAX_SIDE, ImageField, uploadImageFile } from '@/components/admin/image-field';
 import { Field, NumberInput, Panel, Table } from '@/components/admin/ui';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,7 @@ function useSaver() {
     setBusy(true); setMsg(null);
     try { await fn(); setMsg({ ok: true, text: ok }); } catch (e) {
       const d = (e as ApiClientError).details;
-      const detail = Array.isArray(d) ? d.map((x: { path?: string; message?: string; name?: string }) => (x.path ? `${x.path}: ${x.message}` : x.message)).join('; ') : '';
+      const detail = Array.isArray(d) ? d.filter((x: { message?: string }) => x.message !== (e as Error).message).map((x: { path?: string; message?: string; name?: string }) => (x.path ? `${x.path}: ${x.message}` : x.message)).join('; ') : '';
       setMsg({ ok: false, text: detail && (e as ApiClientError).code === 'VALIDATION_ERROR' ? `${(e as Error).message} (${detail})` : (e as Error).message });
     } finally { setBusy(false); }
   };
@@ -38,16 +39,21 @@ interface PlanRow { code: string; name: string; price: number; durationDays: num
 interface Subscription { enabled: boolean; paymentRequired: boolean; currency: string; paymentExpiryMinutes: number; plans: PlanRow[] }
 interface Video { storageRoot: string; hlsResolutions: number[]; ffmpeg: { preset: string; crf: number; segmentSeconds: number; threads: number }; playbackTokenExpiryMinutes: number }
 interface Security { sessionExpiryDays: number; loginMaxAttempts: number; loginLockMinutes: number; allowedAdminIps: string[] }
-interface Banner { title: string; subtitle?: string; image?: string; link?: string; enabled: boolean }
+interface Banner { title: string; subtitle?: string; image?: string; link?: string; enabled: boolean; file?: File | null }
+interface Ad { image: string; link?: string; enabled: boolean; file?: File | null }
+const MAX_BANNERS = 10;
 interface Section { key: string; title: string; type: 'new' | 'popular' | 'continue' | 'category'; categorySlug?: string; visible: boolean; order: number }
-interface Homepage { heroBanners: Banner[]; featuredMovieIds: string[]; sections: Section[] }
+interface Homepage { heroBanners: Banner[]; adBanners?: Ad[]; featuredMovieIds: string[]; sections: Section[] }
 
 function useSection<T>(entry: Entry<T>, path: string, reload: () => Promise<void>) {
   const [form, setForm] = useState(entry.value);
   useEffect(() => { setForm(entry.value); }, [entry.value]);
   const saver = useSaver();
-  const save = () => saver.run(async () => {
-    await api(`/api/admin/settings/${path}`, { method: 'PUT', body: { value: form, expectedVersion: entry.version } });
+  const save = (prepare?: (value: T) => Promise<T>) => saver.run(async () => {
+    const value = prepare ? await prepare(form) : form;
+    // Дараагийн алхам бүтэлгүйтвэл дахин дарахад зураг давхар байршихгүй.
+    setForm(value);
+    await api(`/api/admin/settings/${path}`, { method: 'PUT', body: { value, expectedVersion: entry.version } });
     await reload();
   });
   return { form, setForm, save, ...saver };
@@ -156,33 +162,111 @@ export function VideoTab({ entry, roots, reload }: { entry: Entry<Video>; roots:
   );
 }
 
+const Arrow = ({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: string }) => (
+  <button type="button" aria-label={label} disabled={disabled} onClick={onClick} className="cursor-pointer text-xs disabled:opacity-30">{children}</button>
+);
+
+const OTHER_LINK = 'other';
+function SlideLink({ value, movies, onChange }: { value: string; movies?: AdminMovie[]; onChange: (link: string) => void }) {
+  const [other, setOther] = useState(false);
+  const isMovie = movies?.some((m) => `/movies/${m.slug}` === value);
+  // Устсан киноны холбоос ч харагдаж, засагдах боломжтой байна.
+  const custom = other || (!!value && !!movies && !isMovie);
+  return (
+    <div className="space-y-2">
+      <Field label="Дарахад хаашаа очих">
+        <Select value={custom ? OTHER_LINK : value} onChange={(e) => {
+          setOther(e.target.value === OTHER_LINK);
+          onChange(e.target.value === OTHER_LINK ? '' : e.target.value);
+        }}>
+          <option value="">Холбоосгүй</option>
+          {movies?.map((m) => <option key={m.id} value={`/movies/${m.slug}`}>{m.title}</option>)}
+          <option value={OTHER_LINK}>Өөр хаяг…</option>
+        </Select>
+      </Field>
+      {custom && <Input aria-label="Хаяг" placeholder="https://…" value={value} onChange={(e) => onChange(e.target.value)} />}
+    </div>
+  );
+}
+
+function RowControls({ title, index, count, row, onMove, onRemove, onEnabled }: { title: string; index: number; count: number; row: { enabled: boolean }; onMove: (dir: number) => void; onRemove: () => void; onEnabled: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex flex-col">
+        <Arrow label="Дээш" disabled={index === 0} onClick={() => onMove(-1)}>▲</Arrow>
+        <Arrow label="Доош" disabled={index === count - 1} onClick={() => onMove(1)}>▼</Arrow>
+      </span>
+      <h3 className="font-semibold">{title} {index + 1}</h3>
+      <label className="ml-auto flex items-center gap-2 text-sm">Идэвхтэй<Switch checked={row.enabled} onCheckedChange={onEnabled} /></label>
+      <Button type="button" variant="ghost" size="icon" aria-label={`${title} ${index + 1} устгах`} className="text-destructive" onClick={onRemove}><Trash2 /></Button>
+    </div>
+  );
+}
+
+const moved = <T,>(rows: T[], i: number, dir: number) => {
+  const next = [...rows];
+  const [row] = next.splice(i, 1);
+  next.splice(i + dir, 0, row);
+  return next;
+};
+
+// Зураг нь тохиргоо хадгалагдах үед л байршина: болиулсан сонголт серверт файл үлдээхгүй.
+const withUploaded = <R extends { image?: string; file?: File | null }>(rows: R[]) => Promise.all(rows.map(async ({ file, ...row }) => (
+  (file ? { ...row, image: await uploadImageFile('/api/admin/banners/image', file, BACKDROP_MAX_SIDE) } : row) as R
+)));
+
 export function HomepageTab({ entry, reload }: { entry: Entry<Homepage>; reload: () => Promise<void> }) {
   const { form: f, setForm, save, msg, busy } = useSection(entry, 'homepage', reload);
+  const movies = useApi<Paginated<AdminMovie>>('/api/admin/movies?limit=100&sort=title');
+  const published = movies.data?.items.filter((m) => m.isPublished);
+  const ads = f.adBanners ?? [];
   const sections = [...f.sections].sort((a, b) => a.order - b.order);
+  const dirty = JSON.stringify(f) !== JSON.stringify(entry.value);
   const setBanner = (i: number, p: Partial<Banner>) => setForm({ ...f, heroBanners: f.heroBanners.map((b, j) => (j === i ? { ...b, ...p } : b)) });
+  const setAd = (i: number, p: Partial<Ad>) => setForm({ ...f, adBanners: ads.map((b, j) => (j === i ? { ...b, ...p } : b)) });
   const setSection = (key: string, p: Partial<Section>) => setForm({ ...f, sections: f.sections.map((s) => (s.key === key ? { ...s, ...p } : s)) });
-  const move = (i: number, dir: number) => {
-    const next = [...sections];
-    const [s] = next.splice(i, 1);
-    next.splice(i + dir, 0, s);
-    setForm({ ...f, sections: next.map((x, order) => ({ ...x, order: order + 1 })) });
-  };
+  const move = (i: number, dir: number) => setForm({ ...f, sections: moved(sections, i, dir).map((x, order) => ({ ...x, order: order + 1 })) });
+  const submit = () => save(async (form) => ({ ...form, heroBanners: await withUploaded(form.heroBanners), adBanners: await withUploaded(form.adBanners ?? []) }));
   return (
     <div className="space-y-6">
       <Panel className="space-y-4">
-        <h2 className="font-bold">Hero баннер</h2>
+        <div>
+          <h2 className="font-bold">Нүүрний слайд</h2>
+          <p className="text-xs text-muted-foreground">Сайтын дээд хэсэгт эргэлдэнэ. Слайд нэмээгүй бол &quot;Онцлох&quot; асаасан кинонууд гарна.</p>
+        </div>
         {f.heroBanners.map((b, i) => (
-          <div key={i} className="grid items-end gap-3 rounded-lg border p-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto_auto]">
-            <Field label="Гарчиг"><Input value={b.title} onChange={(e) => setBanner(i, { title: e.target.value })} /></Field>
-            <Field label="Дэд гарчиг"><Input value={b.subtitle ?? ''} onChange={(e) => setBanner(i, { subtitle: e.target.value })} /></Field>
-            <Field label="Зураг URL"><Input value={b.image ?? ''} onChange={(e) => setBanner(i, { image: e.target.value })} /></Field>
-            <Field label="Холбоос"><Input value={b.link ?? ''} onChange={(e) => setBanner(i, { link: e.target.value })} /></Field>
-            <div className="flex h-10 items-center"><Switch aria-label="Идэвхтэй" checked={b.enabled} onCheckedChange={(v) => setBanner(i, { enabled: v })} /></div>
-            <Button variant="ghost" size="icon" aria-label="Устгах" onClick={() => setForm({ ...f, heroBanners: f.heroBanners.filter((_, j) => j !== i) })}><Trash2 /></Button>
+          <div key={i} className="space-y-3 rounded-lg border p-3">
+            <RowControls title="Слайд" index={i} count={f.heroBanners.length} row={b} onEnabled={(enabled) => setBanner(i, { enabled })}
+              onMove={(dir) => setForm({ ...f, heroBanners: moved(f.heroBanners, i, dir) })} onRemove={() => setForm({ ...f, heroBanners: f.heroBanners.filter((_, j) => j !== i) })} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <ImageField label="Зураг" hint="Хамгийн тохиромжтой нь 1920×800. Утсанд хоёр тал нь таслагддаг тул гол хэсгийг төвд байрлуулна уу." src={b.image ?? ''} file={b.file ?? null} previewClass="h-32 w-full" onPick={(file) => setBanner(i, { file })} onRemove={() => setBanner(i, { image: '', file: null })} />
+              <div className="space-y-3">
+                <Field label="Гарчиг" hint="Заавал биш. Хоосон бол зөвхөн зураг харагдана."><Input value={b.title} onChange={(e) => setBanner(i, { title: e.target.value })} /></Field>
+                <Field label="Дэд гарчиг"><Input value={b.subtitle ?? ''} onChange={(e) => setBanner(i, { subtitle: e.target.value })} /></Field>
+                <SlideLink value={b.link ?? ''} movies={published} onChange={(link) => setBanner(i, { link })} />
+              </div>
+            </div>
           </div>
         ))}
-        <Button variant="outline" onClick={() => setForm({ ...f, heroBanners: [...f.heroBanners, { title: 'Шинэ баннер', enabled: false }] })}><Plus />Баннер нэмэх</Button>
-        <Field label="Онцлох киноны ID-ууд" hint="Таслалаар тусгаарлана. Эхнийх нь hero-д гарна."><Input value={f.featuredMovieIds.join(', ')} onChange={(e) => setForm({ ...f, featuredMovieIds: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} /></Field>
+        <Button variant="outline" disabled={f.heroBanners.length >= MAX_BANNERS} onClick={() => setForm({ ...f, heroBanners: [...f.heroBanners, { title: '', enabled: true }] })}><Plus />Слайд нэмэх</Button>
+        <Field label="Онцлох киноны ID-ууд" hint="Заавал биш. Слайдгүй үед онцлох кинонуудын дарааллыг заана. Таслалаар тусгаарлана."><Input value={f.featuredMovieIds.join(', ')} onChange={(e) => setForm({ ...f, featuredMovieIds: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} /></Field>
+      </Panel>
+      <Panel className="space-y-4">
+        <div>
+          <h2 className="font-bold">Зарын баннер</h2>
+          <p className="text-xs text-muted-foreground">Киноны эгнээ хоёр тутмын дараа нэг зар гарна. Зураг бүтнээрээ харагдана.</p>
+        </div>
+        {ads.map((ad, i) => (
+          <div key={i} className="space-y-3 rounded-lg border p-3">
+            <RowControls title="Зар" index={i} count={ads.length} row={ad} onEnabled={(enabled) => setAd(i, { enabled })}
+              onMove={(dir) => setForm({ ...f, adBanners: moved(ads, i, dir) })} onRemove={() => setForm({ ...f, adBanners: ads.filter((_, j) => j !== i) })} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <ImageField label="Зураг" hint="Хамгийн тохиромжтой нь 1600×300." src={ad.image} file={ad.file ?? null} previewClass="h-24 w-full" onPick={(file) => setAd(i, { file })} onRemove={() => setAd(i, { image: '', file: null })} />
+              <Field label="Дарахад очих хаяг" hint="Заавал биш. Шинэ цонхонд нээгдэнэ."><Input placeholder="https://…" value={ad.link ?? ''} onChange={(e) => setAd(i, { link: e.target.value })} /></Field>
+            </div>
+          </div>
+        ))}
+        <Button variant="outline" disabled={ads.length >= MAX_BANNERS} onClick={() => setForm({ ...f, adBanners: [...ads, { image: '', enabled: true }] })}><Plus />Зар нэмэх</Button>
       </Panel>
       <Panel className="space-y-3">
         <h2 className="font-bold">Хэсгүүд (дараалал, харагдац)</h2>
@@ -190,8 +274,8 @@ export function HomepageTab({ entry, reload }: { entry: Entry<Homepage>; reload:
           {sections.map((s, i) => (
             <li key={s.key} className="flex flex-wrap items-center gap-3 py-2">
               <span className="flex flex-col">
-                <button aria-label="Дээш" disabled={i === 0} onClick={() => move(i, -1)} className="cursor-pointer text-xs disabled:opacity-30">▲</button>
-                <button aria-label="Доош" disabled={i === sections.length - 1} onClick={() => move(i, 1)} className="cursor-pointer text-xs disabled:opacity-30">▼</button>
+                <Arrow label="Дээш" disabled={i === 0} onClick={() => move(i, -1)}>▲</Arrow>
+                <Arrow label="Доош" disabled={i === sections.length - 1} onClick={() => move(i, 1)}>▼</Arrow>
               </span>
               <Input aria-label="Хэсгийн нэр" className="max-w-xs" value={s.title} onChange={(e) => setSection(s.key, { title: e.target.value })} />
               <span className="text-xs text-muted-foreground">{s.type}{s.categorySlug ? `: ${s.categorySlug}` : ''}</span>
@@ -199,8 +283,11 @@ export function HomepageTab({ entry, reload }: { entry: Entry<Homepage>; reload:
             </li>
           ))}
         </ul>
-        <SaveRow msg={msg} busy={busy} save={() => void save()} />
       </Panel>
+      <div className="sticky bottom-0 z-10 space-y-2 rounded-xl border bg-card p-4 shadow-lg">
+        {dirty && !busy && !(msg && !msg.ok) && <Notice tone="warning">Хадгалаагүй өөрчлөлт байна. Сайтад гарахын тулд &quot;Хадгалах&quot; дарна уу.</Notice>}
+        <SaveRow msg={dirty && msg?.ok ? null : msg} busy={busy} save={() => void submit()} />
+      </div>
     </div>
   );
 }

@@ -11,12 +11,15 @@ interface PlaybackClaims { sub: string; mid: string; sid: string }
 // /v/<токен>/<киноны id>/<HLS файл>: HLS-ийн харьцангуй замууд токенийг автоматаар өвлөнө.
 const HLS_FILE = /^(master\.m3u8|\d{3,4}p\/(index\.m3u8|seg_\d{1,6}\.ts))$/;
 
+// Шинэ файл боловсруулагдаж эсвэл бүтэлгүйтсэн ч хуучин HLS дискэнд бүтэн байгаа.
+export const isPlayable = (movie: { videoStatus?: string | null; hlsPath?: string | null }) => movie.videoStatus === 'ready' || !!movie.hlsPath;
+
 export const StreamService = {
   async grant(userId: Types.ObjectId, movieId: string, ip?: string) {
-    const movie = await Movie.findById(movieId).lean();
+    const movie = await Movie.findById(movieId).select('+hlsPath').lean();
     if (!movie || !movie.isPublished) throw notFound('Кино олдсонгүй.');
     if (!(await SubscriptionService.hasAccess(userId))) throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Кино үзэхийн тулд идэвхтэй эрх шаардлагатай.');
-    if (movie.videoStatus !== 'ready') throw new AppError(409, 'VIDEO_NOT_READY', 'Энэ киноны видео бэлэн болоогүй байна.');
+    if (!isPlayable(movie)) throw new AppError(409, 'VIDEO_NOT_READY', 'Энэ киноны видео бэлэн болоогүй байна.');
     const { playbackTokenExpiryMinutes } = await VideoConfigurationService.get();
     const expiresAt = new Date(Date.now() + playbackTokenExpiryMinutes * 60_000);
     const session = await PlaybackSession.create({ userId, movieId: movie._id, expiresAt, ipAddress: ip });

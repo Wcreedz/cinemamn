@@ -51,12 +51,17 @@ export const securitySchema = z.object({
 
 export const homepageSchema = z.object({
   heroBanners: z.array(z.object({
-    title: z.string().trim().min(1).max(120),
+    title: z.string().trim().max(120).default(''),
     subtitle: z.string().trim().max(300).optional(),
     image: url.optional(),
     link: url.optional(),
     enabled: z.boolean(),
-  })).max(10),
+  }).refine((b) => b.title || b.image, { path: ['image'], message: 'Слайдад зураг эсвэл гарчиг оруулна уу' })).max(10),
+  adBanners: z.array(z.object({
+    image: url.refine(Boolean, 'Зарын зураг оруулна уу'),
+    link: url.optional(),
+    enabled: z.boolean(),
+  })).max(10).default([]),
   featuredMovieIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).max(20),
   sections: z.array(z.object({
     key: z.string().regex(/^[a-z0-9-]+$/),

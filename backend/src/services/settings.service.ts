@@ -22,7 +22,7 @@ export const defaults = (): SettingValues => ({
   },
   security: { sessionExpiryDays: 30, loginMaxAttempts: 5, loginLockMinutes: 15, allowedAdminIps: [] },
   homepage: {
-    heroBanners: [], featuredMovieIds: [],
+    heroBanners: [], adBanners: [], featuredMovieIds: [],
     sections: [
       section('new', 'Шинээр нэмэгдсэн', 'new', 1),
       section('mongol', 'Монгол кино', 'category', 2, 'mongol'),
@@ -45,7 +45,8 @@ export const SettingsService = {
     const hit = cache.get(key) as Entry<K> | undefined;
     if (hit && !opts.fresh && Date.now() - hit.at < CACHE_TTL_MS) return hit;
     const doc = await SystemSetting.findOne({ key }).lean();
-    const entry: Entry<K> = { value: (doc?.value ?? defaults()[key]) as SettingValues[K], version: doc?.version ?? 0, at: Date.now() };
+    // Хадгалсны дараа нэмэгдсэн талбар хуучин баримтад байхгүй: анхны утгаар нөхнө.
+    const entry: Entry<K> = { value: { ...defaults()[key], ...doc?.value } as SettingValues[K], version: doc?.version ?? 0, at: Date.now() };
     cache.set(key, entry as unknown as Entry<SettingKey>);
     return entry;
   },
@@ -80,7 +81,7 @@ export const SettingsService = {
     // Энд зөвхөн нийтэд ил байж болох талбаруудыг нэг бүрчлэн сонгоно.
     return {
       general: { siteName: general.siteName, logo: general.logo, favicon: general.favicon, description: general.description, maintenanceMode: general.maintenanceMode },
-      homepage: { heroBanners: homepage.heroBanners.filter((b) => b.enabled), featuredMovieIds: homepage.featuredMovieIds, sections: homepage.sections },
+      homepage: { heroBanners: homepage.heroBanners.filter((b) => b.enabled), adBanners: homepage.adBanners.filter((b) => b.enabled), featuredMovieIds: homepage.featuredMovieIds, sections: homepage.sections },
       subscription: { enabled: subscription.enabled, paymentRequired: subscription.paymentRequired, currency: subscription.currency },
     };
   },

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Category } from '@mongolflix/shared';
+import { ImageField, uploadImageFile } from '@/components/admin/image-field';
 import { Field, NumberInput, PageHeader, Panel, Table } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,23 +10,35 @@ import { Switch } from '@/components/ui/switch';
 import { useApi } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 
-const empty = { name: '', slug: '', sortOrder: 0, isActive: true };
+const IMAGE_MAX_SIDE = 800;
+const empty = { name: '', slug: '', image: '', sortOrder: 0, isActive: true };
 
 export default function AdminCategories() {
   const { data, error, reload } = useApi<{ items: Category[] }>('/api/admin/categories');
   const [f, setF] = useState(empty);
+  const [file, setFile] = useState<File | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (!data) return <Skeleton className="h-64" />;
+  const reset = () => { setF(empty); setFile(null); setEditing(null); setMsg(null); };
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
+    setBusy(true);
     try {
-      await (editing ? api(`/api/admin/categories/${editing}`, { method: 'PUT', body: f }) : api('/api/admin/categories', { body: f }));
-      setF(empty); setEditing(null);
+      let id = editing;
+      if (id) await api(`/api/admin/categories/${id}`, { method: 'PUT', body: f });
+      else {
+        id = (await api<{ id: string }>('/api/admin/categories', { body: f })).id;
+        // Зураг бүтэлгүйтвэл дахин дарахад шинэ ангилал биш, энэ нь шинэчлэгдэнэ.
+        setEditing(id);
+      }
+      if (file) await uploadImageFile(`/api/admin/categories/${id}/image`, file, IMAGE_MAX_SIDE);
+      reset();
       await reload();
-    } catch (err) { setMsg((err as Error).message); }
+    } catch (err) { setMsg((err as Error).message); } finally { setBusy(false); }
   };
   const del = async (c: Category) => {
     if (!window.confirm(`"${c.name}" ангиллыг устгах уу?`)) return;
@@ -35,21 +48,30 @@ export default function AdminCategories() {
     <>
       <PageHeader title="Ангилал" />
       <Panel className="mb-6">
-        <form onSubmit={(e) => void save(e)} className="grid gap-4 sm:grid-cols-[1fr_1fr_6rem_auto_auto] sm:items-end">
-          <Field label="Нэр"><Input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-          <Field label="Slug"><Input required pattern="[a-z0-9]+(-[a-z0-9]+)*" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} /></Field>
-          <Field label="Дараалал"><NumberInput value={f.sortOrder} onChange={(v) => setF({ ...f, sortOrder: v })} /></Field>
-          <label className="flex h-10 items-center gap-2 text-sm">Идэвхтэй<Switch checked={f.isActive} onCheckedChange={(v) => setF({ ...f, isActive: v })} /></label>
-          <Button type="submit">{editing ? 'Хадгалах' : 'Нэмэх'}</Button>
+        <form onSubmit={(e) => void save(e)} className="grid gap-4 md:grid-cols-[16rem_1fr]">
+          <ImageField label="Зураг" hint="Заавал биш. Хамгийн тохиромжтой нь 600×340." src={f.image} file={file} disabled={busy} previewClass="h-28 w-full" onPick={setFile} onRemove={() => { setFile(null); setF({ ...f, image: '' }); }} />
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-[1fr_1fr_6rem_auto] sm:items-end">
+              <Field label="Нэр"><Input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+              <Field label="Slug"><Input required pattern="[a-z0-9]+(-[a-z0-9]+)*" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} /></Field>
+              <Field label="Дараалал"><NumberInput value={f.sortOrder} onChange={(v) => setF({ ...f, sortOrder: v })} /></Field>
+              <label className="flex h-10 items-center gap-2 text-sm">Идэвхтэй<Switch checked={f.isActive} onCheckedChange={(v) => setF({ ...f, isActive: v })} /></label>
+            </div>
+            {msg && <Notice tone="danger">{msg}</Notice>}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={busy}>{busy ? 'Хадгалж байна…' : editing ? 'Хадгалах' : 'Нэмэх'}</Button>
+              {editing && <Button type="button" variant="outline" disabled={busy} onClick={reset}>Болих</Button>}
+            </div>
+          </div>
         </form>
-        {msg && <Notice tone="danger" className="mt-3">{msg}</Notice>}
       </Panel>
-      <Table head={['Нэр', 'Slug', 'Дараалал', 'Идэвхтэй', '']}>
+      <Table head={['Зураг', 'Нэр', 'Slug', 'Дараалал', 'Идэвхтэй', '']}>
         {data.items.map((c) => (
           <tr key={c.id}>
+            <td className="px-4 py-3">{c.image ? <img src={c.image} alt="" className="h-10 w-16 rounded object-cover" /> : <span className="text-muted-foreground">Зураггүй</span>}</td>
             <td className="px-4 py-3 font-semibold">{c.name}</td><td className="px-4 py-3">{c.slug}</td><td className="px-4 py-3">{c.sortOrder}</td><td className="px-4 py-3">{c.isActive ? 'Тийм' : 'Үгүй'}</td>
             <td className="space-x-2 px-4 py-3 text-right">
-              <Button size="sm" variant="outline" onClick={() => { setEditing(c.id); setF({ name: c.name, slug: c.slug, sortOrder: c.sortOrder, isActive: c.isActive }); }}>Засах</Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditing(c.id); setFile(null); setMsg(null); setF({ name: c.name, slug: c.slug, image: c.image ?? '', sortOrder: c.sortOrder, isActive: c.isActive }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Засах</Button>
               <Button size="sm" variant="ghost" onClick={() => void del(c)}>Устгах</Button>
             </td>
           </tr>

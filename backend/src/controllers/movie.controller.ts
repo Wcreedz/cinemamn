@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { Category, Movie } from '../models';
 import { notFound } from '../utils/errors';
 import { escapeRegex, paged, parse } from '../utils/http';
+import { isPlayable } from '../services/stream.service';
 import { movieQuery } from '../validators';
 import { z } from 'zod';
 
@@ -49,9 +50,10 @@ export async function popular(_req: Request, res: Response) {
   res.json({ items: (await published().sort({ viewCount: -1 }).limit(20).lean()).map(movieSummary) });
 }
 export async function bySlug(req: Request, res: Response) {
-  const movie = await Movie.findOne({ slug: String(req.params.slug), isPublished: true }).populate('genres').lean();
+  const movie = await Movie.findOne({ slug: String(req.params.slug), isPublished: true }).select('+hlsPath').populate('genres').lean();
   if (!movie) throw notFound('Кино олдсонгүй.');
-  res.json(movieDetail(movie));
+  // Файл солигдож байхад үзэгчид хуучин киногоо үзсээр байна: явцын төлөв зөвхөн админд хамаатай.
+  res.json({ ...movieDetail(movie), videoStatus: isPlayable(movie) ? 'ready' : movie.videoStatus });
 }
 export async function categories(_req: Request, res: Response) {
   const items = await Category.find({ isActive: true }).sort({ sortOrder: 1, name: 1 }).lean();

@@ -5,7 +5,7 @@ import path from 'path';
 import { promisify } from 'util';
 import { env } from '../src/config/env';
 import { Movie, Subscription, VideoJob } from '../src/models';
-import { VideoService } from '../src/services/video.service';
+import { transcode, VideoService } from '../src/services/video.service';
 import { api, login, makeMovie, resetDb, startDb, stopDb, uploadVideo } from './helpers';
 
 const run = promisify(execFile);
@@ -137,5 +137,100 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     const seg = await api().get(`${base}480p/seg_00000.ts`).buffer(true).parse((res, cb) => { const c: Buffer[] = []; res.on('data', (d) => c.push(d)); res.on('end', () => cb(null, Buffer.concat(c))); });
     expect(seg.status).toBe(200);
     expect((seg.body as Buffer)[0]).toBe(0x47); // MPEG-TS sync byte
+  });
+
+  async function readyMovie() {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    await VideoService.process((await VideoService.claimNext())!);
+    const viewer = await login();
+    await Subscription.create({ seq: 1, userId: viewer.user._id, planCode: 'MONTHLY', amount: 1, currency: 'MNT', status: 'active', startedAt: new Date(), expiresAt: new Date(Date.now() + 86_400_000) });
+    return { movie, admin, viewer };
+  }
+
+  it('файл солих бүх шатанд хуучин кино үзэгдсээр, шинэ нь бэлэн болоход солигдоно', async () => {
+    const { movie, admin, viewer } = await readyMovie();
+    const watchable = async () => {
+      expect((await api().get(`/api/movies/${movie.slug}`)).body.videoStatus).toBe('ready');
+      const grant = await viewer.agent.post(`/api/stream/${movie._id}/token`);
+      expect(grant.status).toBe(200);
+      expect((await api().get(new URL(grant.body.manifestUrl).pathname)).status).toBe(200);
+    };
+    await watchable();
+
+    // Шинэ файл дараалалд байна: админ жинхэнэ төлвийг, үзэгч хуучин киног харна.
+    const replace = await uploadVideo(admin.agent, movie._id, sample, 'shine.mkv');
+    expect(replace.status).toBe(202);
+    const queued = await admin.agent.get(`/api/admin/movies/${movie._id}`);
+    expect(queued.body.videoStatus).toBe('queued');
+    expect(queued.body.videoPlayable).toBe(true);
+    await watchable();
+
+    // Шинэ файл эвдэрхий байсан ч хуучин кино алга болохгүй.
+    const job = (await VideoService.claimNext())!;
+    await fs.writeFile(job.sourcePath, 'эвдэрхий файл');
+    await VideoService.process(job);
+    expect((await admin.agent.get(`/api/admin/movies/${movie._id}`)).body.videoStatus).toBe('failed');
+    await watchable();
+
+    // Өөр өргөтгөлтэй шинэ файл амжилттай бол хуучин эх файл дискэнд үлдэхгүй.
+    const before = (await Movie.findById(movie._id).select('+videoSource').lean())!.videoSource!;
+    await uploadVideo(admin.agent, movie._id, sample, 'shine.mkv');
+    await VideoService.process((await VideoService.claimNext())!);
+    const after = (await Movie.findById(movie._id).select('+videoSource').lean())!;
+    expect(after.videoStatus).toBe('ready');
+    expect(after.videoSource).toMatch(/\.mkv$/);
+    await fs.access(after.videoSource!);
+    await expect(fs.access(before)).rejects.toThrow();
+    await watchable();
+  });
+
+  it('видеогүй кино, анхны боловсруулалт дээр үзэх боломжгүй хэвээр', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    expect((await api().get(`/api/movies/${movie.slug}`)).body.videoStatus).toBe('queued');
+    expect((await admin.agent.get(`/api/admin/movies/${movie._id}`)).body.videoPlayable).toBe(false);
+    const viewer = await login();
+    await Subscription.create({ seq: 1, userId: viewer.user._id, planCode: 'MONTHLY', amount: 1, currency: 'MNT', status: 'active', startedAt: new Date(), expiresAt: new Date(Date.now() + 86_400_000) });
+    expect((await viewer.agent.post(`/api/stream/${movie._id}/token`)).status).toBe(409);
+  });
+
+  it('дараалалд байгаа киног устгавал эх файл, ажил нь үлдэхгүй', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    const up = await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    const { sourcePath } = (await VideoJob.findById(up.body.jobId).lean())!;
+    expect((await admin.agent.delete(`/api/admin/movies/${movie._id}`)).status).toBe(200);
+    await expect(fs.access(sourcePath)).rejects.toThrow();
+    expect(await VideoJob.countDocuments({ movieId: movie._id })).toBe(0);
+    expect(await VideoService.claimNext()).toBeNull();
+  });
+
+  it('боловсруулж байх үед устгасан кино дискэнд юу ч үлдээхгүй', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    const job = (await VideoService.claimNext())!;
+    expect((await admin.agent.delete(`/api/admin/movies/${movie._id}`)).status).toBe(200);
+    await VideoService.process(job);
+    const root = env.VIDEO_DEFAULT_ROOT;
+    await expect(fs.access(path.join(root, 'hls', String(movie._id)))).rejects.toThrow();
+    await expect(fs.access(path.join(root, 'originals', `${movie._id}.mp4`))).rejects.toThrow();
+    await expect(fs.access(job.sourcePath)).rejects.toThrow();
+    expect((await fs.readdir(path.join(root, 'temp'))).length).toBe(0);
+    expect(await VideoJob.countDocuments({ movieId: movie._id })).toBe(0);
+  });
+
+  it('устгасан киноны FFmpeg дуустал хүлээхгүй, шууд зогсоно', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    const job = (await VideoService.claimNext())!;
+    const stop = new AbortController();
+    stop.abort();
+    await expect(transcode(job.sourcePath, path.join(env.VIDEO_DEFAULT_ROOT, 'temp', 'abort-test'), { preset: 'ultrafast', crf: 28, segmentSeconds: 2, threads: 1 }, [480], undefined, undefined, undefined, stop.signal)).rejects.toThrow();
+    await fs.rm(path.join(env.VIDEO_DEFAULT_ROOT, 'temp', 'abort-test'), { recursive: true, force: true });
   });
 });

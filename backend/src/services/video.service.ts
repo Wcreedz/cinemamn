@@ -49,7 +49,7 @@ export function planLadder(sourceHeight: number, configured: number[]) {
   return ladder.length ? ladder : [sourceHeight - (sourceHeight % 2)];
 }
 
-export async function transcode(source: string, outDir: string, cfg: VideoSettings['ffmpeg'], resolutions: number[], ffmpeg = env.FFMPEG_PATH, ffprobe = env.FFPROBE_PATH, onProgress?: (fraction: number) => void) {
+export async function transcode(source: string, outDir: string, cfg: VideoSettings['ffmpeg'], resolutions: number[], ffmpeg = env.FFMPEG_PATH, ffprobe = env.FFPROBE_PATH, onProgress?: (fraction: number) => void, signal?: AbortSignal) {
   const info = await probe(source, ffprobe);
   const ladder = planLadder(info.height, resolutions);
   const variants: string[] = [];
@@ -66,7 +66,7 @@ export async function transcode(source: string, outDir: string, cfg: VideoSettin
       '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
       '-f', 'hls', '-hls_time', String(cfg.segmentSeconds), '-hls_playlist_type', 'vod',
       '-hls_segment_filename', path.join(dir, 'seg_%05d.ts'), path.join(dir, 'index.m3u8'),
-    ], { maxBuffer: PROGRESS_MAX_BUFFER });
+    ], { maxBuffer: PROGRESS_MAX_BUFFER, signal });
     // ffmpeg-ийн out_time_ms нь нэрнээс үл хамааран микросекунд байдаг.
     encoding.child.stdout?.on('data', (chunk) => {
       const last = [...String(chunk).matchAll(/out_time_ms=(\d+)/g)].pop();
@@ -114,6 +114,13 @@ export const VideoService = {
     return job;
   },
 
+  // Боловсруулж буй ажлыг worker өөрөө зогсоож цэвэрлэнэ.
+  async discardForMovie(movieId: string) {
+    const jobs = await VideoJob.find({ movieId, status: { $ne: 'processing' } }).lean();
+    await Promise.all(jobs.map((j) => fs.rm(j.sourcePath, { force: true })));
+    await VideoJob.deleteMany({ _id: { $in: jobs.map((j) => j._id) } });
+  },
+
   // Серверийн асуудал засагдсаны дараа файлаа дахин байршуулахгүйгээр боловсруулна.
   async retry(movieId: string) {
     const job = await VideoJob.findOne({ movieId, status: 'failed', retryable: true }).sort({ createdAt: -1 });
@@ -146,6 +153,8 @@ export const VideoService = {
     await Movie.updateOne({ _id: movieId }, { $set: { videoStatus: 'processing', videoProgress: 0 }, $unset: { videoProcessSeconds: 1 } });
     const startedAt = Date.now();
     let reported = 0;
+    const stop = new AbortController();
+    const movieGone = async () => !(await Movie.exists({ _id: movieId }));
     // Явц бичих бүрт түгжээг сунгана: ажиллаж байгаа урт киног requeueStale давхар эхлүүлэхгүй.
     const onProgress = (fraction: number) => {
       const percent = Math.floor(fraction * 100);
@@ -154,13 +163,18 @@ export const VideoService = {
       void Promise.all([
         Movie.updateOne({ _id: movieId, videoStatus: 'processing' }, { $set: { videoProgress: percent } }),
         VideoJob.updateOne({ _id: job._id }, { $set: { lockedAt: new Date() } }),
+        // Устгасан киног цаашид боловсруулж CPU, дараагийн киног бүү саатуул.
+        movieGone().then((gone) => { if (gone) stop.abort(); }),
       ]).catch((err) => console.error('[video] явц бичиж чадсангүй:', (err as Error).message));
     };
     try {
+      if (await movieGone()) throw new Error('Кино устгагдсан.');
       await fs.rm(work, { recursive: true, force: true });
       await fs.mkdir(work, { recursive: true });
-      const { info } = await transcode(job.sourcePath, work, settings.ffmpeg, settings.hlsResolutions, undefined, undefined, onProgress);
+      const { info } = await transcode(job.sourcePath, work, settings.ffmpeg, settings.hlsResolutions, undefined, undefined, onProgress, stop.signal);
       await verifyHls(work);
+      if (await movieGone()) throw new Error('Кино устгагдсан.');
+      const previous = await Movie.findById(movieId).select('+videoSource').lean();
       await fs.mkdir(dirs.hls, { recursive: true });
       await fs.mkdir(dirs.originals, { recursive: true });
       const finalDir = path.join(dirs.hls, movieId);
@@ -173,7 +187,15 @@ export const VideoService = {
         $unset: { videoError: 1, videoProgress: 1 },
       });
       await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'ready', sourcePath: original, finishedAt: new Date() }, $unset: { error: 1 } });
+      // Өөр өргөтгөлтэй файлаар солиход хуучин эх файл өөрөө дарагдахгүй.
+      if (previous?.videoSource && previous.videoSource !== original) await fs.rm(previous.videoSource, { force: true });
     } catch (err) {
+      if (await movieGone()) {
+        await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);
+        await fs.rm(job.sourcePath, { force: true }).catch(() => undefined);
+        await VideoJob.deleteOne({ _id: job._id });
+        return;
+      }
       const error = err as NodeJS.ErrnoException;
       const retryable = isEnvironmentError(error);
       const message = failureMessage(error);

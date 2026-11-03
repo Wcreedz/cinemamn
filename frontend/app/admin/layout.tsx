@@ -1,11 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BarChart3, CreditCard, Crown, Film, Globe, History, LayoutGrid, LogOut, Menu, Settings, Users, X } from 'lucide-react';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/misc';
+import { Spinner } from '@/components/ui/misc';
 import { cn } from '@/lib/utils';
 
 const GROUPS = [
@@ -31,14 +31,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, loading, settings, logout } = useApp();
   const [open, setOpen] = useState(false);
   const active = (href: string) => (href === '/admin' ? path === '/admin' : path.startsWith(href));
-  // Нэвтрэх хуудас нь цэс, эрхийн шалгалтгүй, зөвхөн theme-ийг өвлөнө.
-  if (path === '/admin/login') return <div className="admin-theme bg-background text-foreground">{children}</div>;
-
-  let body: React.ReactNode = children;
+  const isLogin = path === '/admin/login';
   // Энэ нь зөвхөн UX: бодит хамгаалалт backend-ийн requireAdmin дээр байна.
-  if (loading) body = <Skeleton className="h-64" />;
-  else if (!user) body = <div className="py-20 text-center"><p className="mb-4 font-semibold">Нэвтрэх шаардлагатай.</p><Button asChild><Link href="/admin/login">Нэвтрэх</Link></Button></div>;
-  else if (user.role === 'user') body = <p className="py-20 text-center font-semibold">Энэ хэсэгт хандах эрхгүй байна.</p>;
+  const denied = !loading && (!user || user.role === 'user');
+  useEffect(() => {
+    if (denied && !isLogin) router.replace('/admin/login');
+  }, [denied, isLogin, router]);
+
+  // Нэвтрэх хуудас нь цэс, эрхийн шалгалтгүй, зөвхөн theme-ийг өвлөнө.
+  if (isLogin) return <div className="admin-theme bg-background text-foreground">{children}</div>;
+  // Эрхгүй хүнд цэс огт харагдахгүй.
+  if (loading || denied) return <div className="admin-theme flex min-h-dvh items-center justify-center bg-background text-foreground"><Spinner className="size-8" /></div>;
 
   return (
     <div className="admin-theme min-h-dvh bg-background text-foreground">
@@ -49,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {user && (
             <div className="hidden items-center gap-2 rounded-xl border px-3 py-1.5 text-sm sm:flex">
               <span className="size-2 rounded-full bg-success" aria-hidden />
-              <span className="font-semibold">{user.email ?? user.phone}</span>
+              <span className="max-w-64 truncate font-semibold">{user.email ?? user.phone}</span>
               <span className="text-xs text-muted-foreground">{user.role}</span>
             </div>
           )}
@@ -81,7 +84,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             ))}
           </nav>
         </aside>
-        <main className="min-w-0 flex-1 p-4 md:p-8">{body}</main>
+        <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
       </div>
     </div>
   );
