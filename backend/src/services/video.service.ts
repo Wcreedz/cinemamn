@@ -14,6 +14,7 @@ const MAX_ATTEMPTS = 3;
 const STALE_LOCK_MS = 6 * 60 * 60 * 1000;
 // -progress хэдэн секунд тутам мөр бичдэг: урт киног боловсруулж байхад хязгаар хэтэрч FFmpeg зогсохгүй.
 const PROGRESS_MAX_BUFFER = 100 * 1024 * 1024;
+const INTERRUPTED = 'Боловсруулалт удаа дараа тасарсан. "Дахин боловсруулах" дарж сэргээнэ үү.';
 const TOOLS_MISSING = 'FFmpeg сервер дээр олдсонгүй. "apt install -y ffmpeg" суулгаад дахин оролдоно уу.';
 const DISK_ERRORS = new Set(['ENOSPC', 'EACCES', 'EPERM', 'EROFS']);
 
@@ -146,9 +147,28 @@ export const VideoService = {
     );
   },
 
-  // Worker унтарсан тохиолдолд түгжигдэж үлдсэн ажлыг дараалалд буцаана.
-  async requeueStale(now = Date.now()) {
-    await VideoJob.updateMany({ status: 'processing', lockedAt: { $lt: new Date(now - STALE_LOCK_MS) }, attempts: { $lt: MAX_ATTEMPTS } }, { $set: { status: 'queued' } });
+  async requeueProcessing(filter: Record<string, unknown> = {}) {
+    const jobs = await VideoJob.find({ ...filter, status: 'processing' }).lean();
+    for (const job of jobs) {
+      if (job.attempts >= MAX_ATTEMPTS) {
+        // Энэ файл worker-ийг унагаж байж болзошгүй тул эргэлдүүлэхгүй. Эх файл хадгалагдсан, админ дахин оролдож болно.
+        await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'failed', error: INTERRUPTED, retryable: true, finishedAt: new Date() } });
+        await Movie.updateOne({ _id: job.movieId }, { $set: { videoStatus: 'failed', videoError: INTERRUPTED }, $unset: { videoProgress: 1 } });
+      } else {
+        await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'queued' } });
+        await Movie.updateOne({ _id: job.movieId }, { $set: { videoStatus: 'queued' }, $unset: { videoProgress: 1 } });
+      }
+    }
+  },
+
+  // Worker нэг л instance (ecosystem.config.cjs): асах үед "processing" байгаа ажлыг хэн ч хийхгүй байна.
+  recoverInterrupted() {
+    return VideoService.requeueProcessing();
+  },
+
+  // Worker ажиллаж байхад гацсан ажлыг дараалалд буцаана. Явц бичих бүрт түгжээ сунгагддаг тул ажиллаж буйд хүрэхгүй.
+  requeueStale(now = Date.now()) {
+    return VideoService.requeueProcessing({ lockedAt: { $lt: new Date(now - STALE_LOCK_MS) } });
   },
 
   async process(job: { _id: unknown; movieId: unknown; sourcePath: string }) {

@@ -29,6 +29,8 @@ async function main() {
   await connectDb();
   console.info('[worker] ажиллаж эхэллээ');
   await VideoService.checkTools().catch((err) => console.error(`[worker] ${err.message}`));
+  // Шинэчлэлт, унтралтаар тасарсан кино 6 цаг хүлээлгүй шууд дараалалд буцна.
+  await VideoService.recoverInterrupted();
   await housekeeping();
   setInterval(() => housekeeping().catch((e) => console.error('[worker]', e)), HOUSEKEEPING_MS);
   await loop();

@@ -153,6 +153,73 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     await fs.access(path.join(env.VIDEO_DEFAULT_ROOT, 'hls', String(movie._id), 'master.m3u8'));
   });
 
+  it('worker дахин асахад тасарсан ажил шууд сэргэж, эх файл эвдрэлгүй дуусна', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    const interrupted = (await VideoService.claimNext())!;
+    // Worker FFmpeg-ийн дунд унтарсан: кино 23%, түгжээ саяхных тул requeueStale авахгүй.
+    await Movie.updateOne({ _id: movie._id }, { $set: { videoStatus: 'processing', videoProgress: 23 } });
+    await VideoService.requeueStale();
+    expect((await VideoJob.findById(interrupted._id).lean())!.status).toBe('processing');
+
+    await VideoService.recoverInterrupted();
+    expect((await VideoJob.findById(interrupted._id).lean())!.status).toBe('queued');
+    const waiting = (await Movie.findById(movie._id).lean())!;
+    expect(waiting.videoStatus).toBe('queued');
+    expect(waiting.videoProgress).toBeUndefined();
+
+    const again = (await VideoService.claimNext())!;
+    expect(String(again._id)).toBe(String(interrupted._id));
+    expect(again.attempts).toBe(2);
+    await VideoService.process(again);
+    expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('ready');
+  });
+
+  it('эхэлсэн ажлуудаас эхнийх нь түрүүлж сэргэнэ, дараалал алдагдахгүй', async () => {
+    const admin = await login('admin');
+    const first = await makeMovie({ videoStatus: 'none' });
+    const second = await makeMovie({ videoStatus: 'none' });
+    await uploadVideo(admin.agent, first._id, sample, 'a.mp4');
+    await uploadVideo(admin.agent, second._id, sample, 'b.mp4');
+    const stuck = (await VideoService.claimNext())!;
+    const running = (await VideoService.claimNext())!;
+    expect(String(stuck.movieId)).toBe(String(first._id));
+    await VideoService.recoverInterrupted();
+    expect(String((await VideoService.claimNext())!._id)).toBe(String(stuck._id));
+    expect(String((await VideoService.claimNext())!._id)).toBe(String(running._id));
+  });
+
+  it('удаа дараа тасарсан ажил гацахгүй: алдаатай болж, файлаа дахин оруулалгүй сэргээж болно', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    const job = (await VideoService.claimNext())!;
+    await VideoJob.updateOne({ _id: job._id }, { $set: { attempts: 3 } });
+    await VideoService.recoverInterrupted();
+    const failed = (await VideoJob.findById(job._id).lean())!;
+    expect([failed.status, failed.retryable]).toEqual(['failed', true]);
+    await fs.access(failed.sourcePath);
+    const detail = await admin.agent.get(`/api/admin/movies/${movie._id}`);
+    expect(detail.body.videoStatus).toBe('failed');
+    expect(detail.body.videoRetryable).toBe(true);
+    expect(detail.body.videoError).toContain('Дахин боловсруулах');
+    expect((await admin.agent.post(`/api/admin/movies/${movie._id}/video/retry`)).status).toBe(202);
+    await VideoService.process((await VideoService.claimNext())!);
+    expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('ready');
+  });
+
+  it('удаан түгжигдсэн ажил хуучин логикоор ч буцна, киноны төлөв хамт шинэчлэгдэнэ', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    const job = (await VideoService.claimNext())!;
+    await Movie.updateOne({ _id: movie._id }, { $set: { videoStatus: 'processing', videoProgress: 40 } });
+    await VideoService.requeueStale(Date.now() + 7 * 3600_000);
+    expect((await VideoJob.findById(job._id).lean())!.status).toBe('queued');
+    expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('queued');
+  });
+
   it('эргүүлэх тэмдэгтэй утасны бичлэг сунгагдахгүй, босоо хэвээр гарна', async () => {
     const movie = await makeMovie({ videoStatus: 'none' });
     const admin = await login('admin');
