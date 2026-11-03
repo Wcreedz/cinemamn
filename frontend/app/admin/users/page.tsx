@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { Paginated, PublicUser } from '@mongolflix/shared';
-import { PageHeader, Pager, Table } from '@/components/admin/ui';
+import { PageHeader, Table } from '@/components/admin/ui';
 import { Input } from '@/components/ui/input';
 import { Badge, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
@@ -18,7 +18,7 @@ export default function AdminUsers() {
       <Input aria-label="Утасаар хайх" placeholder="Утасны дугаараар хайх" className="mb-4 max-w-sm" value={q} onChange={(e) => { setPage(1); setQ(e.target.value.replace(/[^\d+]/g, '')); }} />
       {error ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : (
         <>
-          <Table head={['Утас', 'Нэр', 'Эрх', 'Төлөв', 'Бүртгэсэн', 'Сүүлд нэвтэрсэн']}>
+          <Table head={['Утас', 'Нэр', 'Эрх', 'Төлөв', 'Бүртгэсэн', 'Сүүлд нэвтэрсэн']} paging={data ?? undefined} onPage={setPage}>
             {data?.items.map((u) => (
               <tr key={u.id}>
                 <td className="px-4 py-3"><Link href={`/admin/users/${u.id}`} className="font-semibold text-primary hover:underline">{u.phone}</Link></td>
@@ -28,7 +28,6 @@ export default function AdminUsers() {
               </tr>
             ))}
           </Table>
-          <Pager page={page} pages={data?.pages ?? 1} onPage={setPage} />
         </>
       )}
     </>

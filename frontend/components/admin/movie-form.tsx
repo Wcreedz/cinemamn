@@ -7,6 +7,7 @@ import type { AdminMovie, Category } from '@mongolflix/shared';
 import { BACKDROP_MAX_SIDE, fileSize, FilePicker, ImageField, POSTER_MAX_SIDE, uploadImageFile } from '@/components/admin/image-field';
 import { Field, Panel } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
+import { Confirm } from '@/components/ui/confirm';
 import { Input, Textarea } from '@/components/ui/input';
 import { Badge, Banner, Notice } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
@@ -110,7 +111,8 @@ function SaveProgress({ task }: { task: SaveTask }) {
 
 const blank = { title: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true, featured: false };
 
-export const deleteQuestion = (title: string) => `"${title}" киног бүрэн устгах уу? Кино файл, зураг, үзсэн түүх устаж, буцаах боломжгүй.`;
+export const deleteQuestion = (title: string) => `"${title}" киног устгах уу?`;
+export const DELETE_DETAIL = 'Кино файл, зураг, үзсэн түүх устаж, буцаах боломжгүй.';
 
 export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?: () => void }) {
   const router = useRouter();
@@ -250,7 +252,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   };
 
   const remove = async () => {
-    if (!movie || !window.confirm(deleteQuestion(movie.title))) return;
+    if (!movie) return;
     setDeleting(true);
     try {
       await api(`/api/admin/movies/${movie.id}`, { method: 'DELETE' });
@@ -273,7 +275,9 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
         <Panel className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-bold">Кино файл</h2>
-            {movie && <VideoBadge movie={movie} />}
+            {movie && (movie.videoStatus === 'ready'
+              ? <Badge tone={movie.isPublished ? 'success' : 'neutral'} className="whitespace-nowrap">{movie.isPublished ? 'Нийтлэгдсэн' : 'Нийтлэгдээгүй'}</Badge>
+              : <VideoBadge movie={movie} />)}
           </div>
           {movie && <VideoTimes movie={movie} />}
           {hasVideo ? <p className="text-xs text-muted-foreground">Кино файл орсон байна. Өөр файл оруулах бол киног жагсаалтаас устгаад шинээр бүртгэнэ үү.</p> : (
@@ -310,7 +314,11 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
           <label className="flex items-center justify-between gap-3 text-sm font-semibold">Онцлох<Switch checked={f.featured} onCheckedChange={(v) => set('featured', v)} /></label>
           <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Хадгалж байна…' : movie ? 'Хадгалах' : 'Кино нэмэх'}</Button>
           {movie && f.isPublished && <Button asChild variant="outline" className="w-full"><Link href={`/movies/${movie.slug}`} target="_blank">Урьдчилж харах</Link></Button>}
-          {movie && <Button type="button" variant="destructive" className="w-full" disabled={busy} onClick={() => void remove()}>{deleting ? 'Устгаж байна…' : 'Киног устгах'}</Button>}
+          {movie && (
+            <Confirm question={deleteQuestion(movie.title)} detail={DELETE_DETAIL} className="w-full" onConfirm={() => void remove()}>
+              <Button type="button" variant="destructive" className="w-full" disabled={busy}>{deleting ? 'Устгаж байна…' : 'Киног устгах'}</Button>
+            </Confirm>
+          )}
         </Panel>
         <Panel className="space-y-4">
           <ImageField label="Постер" src={f.poster} file={images.poster} disabled={busy} previewClass="h-32" onPick={(file) => setImages((s) => ({ ...s, poster: file }))} onRemove={() => removeImage('poster')} />

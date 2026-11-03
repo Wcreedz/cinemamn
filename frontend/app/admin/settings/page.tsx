@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { Paginated } from '@mongolflix/shared';
 import { AdminsTab, AllSettings, GeneralTab, HomepageTab, PaymentTab, SecurityTab, SubscriptionTab, VideoTab } from '@/components/admin/settings-tabs';
 import { LogTable, type LogRow } from '@/components/admin/log-table';
-import { PageHeader, Pager } from '@/components/admin/ui';
+import { PageHeader } from '@/components/admin/ui';
 import { ErrorState, Skeleton } from '@/components/ui/misc';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApi } from '@/hooks/use-api';
@@ -17,7 +17,7 @@ function History() {
   const [page, setPage] = useState(1);
   const { data, error, reload } = useApi<Paginated<LogRow>>(`/api/admin/settings/history?page=${page}`);
   if (error) return <ErrorState message={error} onRetry={reload} />;
-  return <><LogTable items={data?.items ?? []} /><Pager page={page} pages={data?.pages ?? 1} onPage={setPage} /></>;
+  return <LogTable data={data ?? undefined} onPage={setPage} />;
 }
 
 export default function AdminSettingsPage() {

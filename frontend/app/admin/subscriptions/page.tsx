@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { Paginated, SubscriptionView } from '@mongolflix/shared';
-import { PageHeader, Pager, Table } from '@/components/admin/ui';
+import { PageHeader, Table } from '@/components/admin/ui';
 import { Select } from '@/components/ui/input';
 import { Badge, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
@@ -22,7 +22,7 @@ export default function AdminSubscriptions() {
       </Select>
       {error ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : (
         <>
-          <Table head={['Утас', 'Багц', 'Дүн', 'Төлөв', 'Эхлэх', 'Дуусах', 'Тэмдэглэл']}>
+          <Table head={['Утас', 'Багц', 'Дүн', 'Төлөв', 'Эхлэх', 'Дуусах', 'Тэмдэглэл']} paging={data ?? undefined} onPage={setPage}>
             {data?.items.map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3"><Link href={`/admin/users/${s.userId}`} className="font-semibold text-primary hover:underline">{s.phone}</Link></td>
@@ -32,7 +32,6 @@ export default function AdminSubscriptions() {
               </tr>
             ))}
           </Table>
-          <Pager page={page} pages={data?.pages ?? 1} onPage={setPage} />
         </>
       )}
     </>

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Paginated, PaymentView } from '@mongolflix/shared';
-import { PageHeader, Pager, Table } from '@/components/admin/ui';
+import { PageHeader, Table } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, Notice, Skeleton } from '@/components/ui/misc';
@@ -53,7 +53,7 @@ export default function AdminPayments() {
       {msg && <Notice tone={msg.ok ? 'success' : 'danger'} className="mb-4">{msg.text}</Notice>}
       {error ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : !data?.items.length ? <EmptyState title="Төлбөр олдсонгүй" /> : (
         <>
-          <Table head={['Захиалга', 'Утас', 'Дүн', 'Төлөв', 'Огноо', '']}>
+          <Table head={['Захиалга', 'Утас', 'Дүн', 'Төлөв', 'Огноо', '']} paging={data} onPage={setPage}>
             {data.items.map((p) => (
               <tr key={p.id}>
                 <td className="px-4 py-3"><p className="font-mono text-xs">{p.orderNumber}</p><p className="max-w-52 truncate text-xs text-muted-foreground" title={p.invoiceId}>{p.invoiceId}</p></td>
@@ -68,7 +68,6 @@ export default function AdminPayments() {
               </tr>
             ))}
           </Table>
-          <Pager page={page} pages={data.pages} onPage={setPage} />
         </>
       )}
     </>

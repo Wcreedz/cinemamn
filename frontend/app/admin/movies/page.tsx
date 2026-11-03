@@ -4,9 +4,10 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { AdminMovie, Paginated } from '@mongolflix/shared';
-import { deleteQuestion, VideoBadge, VideoTimes, videoErrorText } from '@/components/admin/movie-form';
-import { PageHeader, Pager, Table } from '@/components/admin/ui';
+import { DELETE_DETAIL, deleteQuestion, VideoBadge, VideoTimes, videoErrorText } from '@/components/admin/movie-form';
+import { PageHeader, Table } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
+import { Confirm } from '@/components/ui/confirm';
 import { Input } from '@/components/ui/input';
 import { Badge, Banner, EmptyState, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
@@ -52,7 +53,6 @@ export default function AdminMovies() {
   }, [working, reload]);
 
   const remove = async (m: AdminMovie) => {
-    if (!window.confirm(deleteQuestion(m.title))) return;
     setDeleting(m.id);
     setDeleteError(null);
     try {
@@ -75,21 +75,22 @@ export default function AdminMovies() {
       <Input aria-label="Хайх" placeholder="Гарчгаар хайх" className="mb-4 max-w-sm" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} />
       {error ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : !data?.items.length ? <EmptyState title="Кино алга байна" /> : (
         <>
-          <Table head={['Гарчиг', 'Төлөв', 'Видео', 'Үзсэн', '']}>
+          <Table head={['Гарчиг', 'Төлөв', 'Видео', 'Үзсэн', '']} paging={data} onPage={setPage}>
             {data.items.map((m) => (
               <tr key={m.id}>
                 <td className="px-4 py-3"><Link href={`/admin/movies/${m.id}`} className="font-semibold text-primary hover:underline">{m.title}</Link>{m.featured && <Badge tone="primary" className="ml-2">Онцлох</Badge>}</td>
                 <td className="px-4 py-3"><Badge tone={m.isPublished ? 'success' : 'neutral'}>{m.isPublished ? 'Нийтлэгдсэн' : 'Ноорог: сайтад харагдахгүй'}</Badge></td>
-                <td className="px-4 py-3"><VideoBadge movie={m} /><VideoTimes movie={m} />{m.videoError && <p className="mt-1 max-w-xs text-xs font-medium text-destructive">{videoErrorText(m.videoError)}</p>}</td>
+                <td className="px-4 py-3">{m.videoStatus !== 'ready' && <VideoBadge movie={m} />}<VideoTimes movie={m} />{m.videoStatus === 'ready' && m.videoUploadSeconds === undefined && m.videoProcessSeconds === undefined && <span className="text-muted-foreground">—</span>}{m.videoError && <p className="mt-1 max-w-xs text-xs font-medium text-destructive">{videoErrorText(m.videoError)}</p>}</td>
                 <td className="px-4 py-3">{m.viewCount}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">
                   <Button asChild size="sm" variant="outline" className="mr-2"><Link href={`/admin/movies/${m.id}`}>Засах</Link></Button>
-                  <Button size="sm" variant="ghost" className="text-destructive" aria-label={`${m.title} устгах`} disabled={deleting !== null} onClick={() => void remove(m)}>{deleting === m.id ? 'Устгаж байна…' : <><Trash2 />Устгах</>}</Button>
+                  <Confirm question={deleteQuestion(m.title)} detail={DELETE_DETAIL} onConfirm={() => void remove(m)}>
+                    <Button size="sm" variant="ghost" className="text-destructive" aria-label={`${m.title} устгах`} disabled={deleting !== null}>{deleting === m.id ? 'Устгаж байна…' : <><Trash2 />Устгах</>}</Button>
+                  </Confirm>
                 </td>
               </tr>
             ))}
           </Table>
-          <Pager page={page} pages={data.pages} onPage={setPage} />
         </>
       )}
     </>

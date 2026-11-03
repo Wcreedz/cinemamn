@@ -4,6 +4,7 @@ import type { Category } from '@mongolflix/shared';
 import { ImageField, uploadImageFile } from '@/components/admin/image-field';
 import { Field, NumberInput, PageHeader, Panel, Table } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
+import { Confirm } from '@/components/ui/confirm';
 import { Input } from '@/components/ui/input';
 import { ErrorState, Notice, Skeleton } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
@@ -41,7 +42,6 @@ export default function AdminCategories() {
     } catch (err) { setMsg((err as Error).message); } finally { setBusy(false); }
   };
   const del = async (c: Category) => {
-    if (!window.confirm(`"${c.name}" ангиллыг устгах уу?`)) return;
     try { await api(`/api/admin/categories/${c.id}`, { method: 'DELETE' }); await reload(); } catch (err) { setMsg((err as Error).message); }
   };
   return (
@@ -72,7 +72,9 @@ export default function AdminCategories() {
             <td className="px-4 py-3 font-semibold">{c.name}</td><td className="px-4 py-3">{c.slug}</td><td className="px-4 py-3">{c.sortOrder}</td><td className="px-4 py-3">{c.isActive ? 'Тийм' : 'Үгүй'}</td>
             <td className="space-x-2 px-4 py-3 text-right">
               <Button size="sm" variant="outline" onClick={() => { setEditing(c.id); setFile(null); setMsg(null); setF({ name: c.name, slug: c.slug, image: c.image ?? '', sortOrder: c.sortOrder, isActive: c.isActive }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Засах</Button>
-              <Button size="sm" variant="ghost" onClick={() => void del(c)}>Устгах</Button>
+              <Confirm question={`"${c.name}" ангиллыг устгах уу?`} onConfirm={() => void del(c)}>
+                <Button size="sm" variant="ghost" aria-label={`${c.name} устгах`}>Устгах</Button>
+              </Confirm>
             </td>
           </tr>
         ))}

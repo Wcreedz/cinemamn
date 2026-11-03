@@ -1,13 +1,14 @@
 'use client';
+import type { Paginated } from '@mongolflix/shared';
 import { Table } from '@/components/admin/ui';
 import { dateTime } from '@/lib/utils';
 
 export interface LogRow { _id: string; action: string; targetType?: string; metadata?: unknown; ipAddress?: string; createdAt: string; adminId?: { email?: string; phone?: string; name?: string } }
 
-export function LogTable({ items }: { items: LogRow[] }) {
+export function LogTable({ data, onPage }: { data?: Paginated<LogRow>; onPage: (p: number) => void }) {
   return (
-    <Table head={['Огноо', 'Админ', 'Үйлдэл', 'IP', 'Дэлгэрэнгүй']}>
-      {items.map((l) => (
+    <Table head={['Огноо', 'Админ', 'Үйлдэл', 'IP', 'Дэлгэрэнгүй']} paging={data} onPage={onPage}>
+      {data?.items.map((l) => (
         <tr key={l._id} className="align-top">
           <td className="whitespace-nowrap px-4 py-3">{dateTime(l.createdAt)}</td>
           <td className="px-4 py-3">{l.adminId?.email ?? l.adminId?.phone}</td>
