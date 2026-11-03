@@ -137,7 +137,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   const current = movie ?? created;
   const [video, setVideo] = useState<File | null>(null);
   const [images, setImages] = useState<{ poster: File | null; backdrop: File | null }>({ poster: null, backdrop: null });
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string; noFile?: boolean } | null>(null);
   const banner = useRef<HTMLDivElement>(null);
   const filePanel = useRef<HTMLDivElement>(null);
   // Урт маягтын доор байсан ч үр дүн нүдэнд шууд өртөнө.
@@ -240,6 +240,13 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
         nextStep();
         await uploadVideo(id, video);
       }
+      // Файлгүй кинонд хадгалаад хаагдвал файл орсон гэж андуурна: хуудсандаа үлдэж шалтгааныг хэлнэ.
+      if (movie && !video && !hasVideo) {
+        setTask(null);
+        setMsg({ ok: true, noFile: true, text: resumable ? `Бусад мэдээлэл хадгалагдлаа. Оруулалт ${resumable.percent}%-д зогссон хэвээр: дээрх хэсгээс "${resumable.fileName}" файлаа сонгоод дахин "Хадгалах" дарна уу.` : 'Бусад мэдээлэл хадгалагдлаа. Дээрх хэсгээс кино файлаа сонгоод дахин "Хадгалах" дарна уу.' });
+        onChanged?.();
+        return;
+      }
       // Дууссаны дараа маягтад юу ч үлдэхгүй: жагсаалтаас үр дүн, боловсруулалтын явцыг харна.
       router.push(`/admin/movies?notice=${movie ? 'saved' : 'created'}${video ? '-video' : ''}${f.isPublished ? '' : '&draft=1'}`);
     } catch (err) {
@@ -281,7 +288,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   return (
     <form onSubmit={(e) => void save(e)}>
       <fieldset disabled={busy} className="grid min-w-0 gap-6 xl:grid-cols-[2fr_1fr]">
-      {msg && <div ref={banner} className="xl:col-span-2"><Banner tone={msg.ok ? 'success' : 'danger'} title={msg.ok ? 'Амжилттай' : 'Амжилтгүй боллоо'}>{msg.text}</Banner></div>}
+      {msg && <div ref={banner} className="xl:col-span-2"><Banner tone={msg.noFile ? 'warning' : msg.ok ? 'success' : 'danger'} title={msg.noFile ? 'Кино файл сонгоогүй байна' : msg.ok ? 'Амжилттай' : 'Амжилтгүй боллоо'}>{msg.text}</Banner></div>}
       <div ref={filePanel} className="min-w-0 scroll-mt-20 space-y-6">
         <Panel className="space-y-3">
           <div className="flex items-center justify-between gap-3">
