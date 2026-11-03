@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Crown, Play, Youtube } from 'lucide-react';
 import type { MovieDetail, PlansResponse } from '@mongolflix/shared';
 import { Poster } from '@/components/movie-card';
@@ -13,9 +14,13 @@ import { money, runtime } from '@/lib/utils';
 export default function MovieDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user, access, settings } = useApp();
-  const { data: m, error, loading, reload } = useApi<MovieDetail>(`/api/movies/${slug}`);
+  const router = useRouter();
+  const { data: m, error, errorCode, loading, reload } = useApi<MovieDetail>(`/api/movies/${slug}`);
+  const gone = errorCode === 'NOT_FOUND';
+  // Устгасан киноны хуучин холбоос: replace нь "буцах"-аар дахин энд ирүүлэхгүй.
+  useEffect(() => { if (gone) router.replace('/'); }, [gone, router]);
   const plans = useApi<PlansResponse>('/api/subscriptions/plans');
-  if (loading) return <Skeleton className="h-96" />;
+  if (loading || gone) return <Skeleton className="h-96" />;
   if (error || !m) return <ErrorState message={error ?? 'Кино олдсонгүй.'} onRetry={reload} />;
   const canWatch = settings?.subscription.paymentRequired === false ? !!user : !!access?.hasAccess;
   const plan = plans.data?.plans[0];

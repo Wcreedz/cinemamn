@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from 'lucide-react';
+import { Expand, Loader2, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Shrink, Volume2, VolumeX } from 'lucide-react';
 import { Select } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -30,9 +30,14 @@ interface Props {
   levels: { index: number; height: number }[];
   level: number;
   onLevel: (level: number) => void;
+  fill: boolean;
+  onFill: () => void;
+  top: React.ReactNode;
 }
 
-export function VideoPlayerControls({ videoRef, containerRef, levels, level, onLevel }: Props) {
+type LockableOrientation = ScreenOrientation & { lock?: (orientation: string) => Promise<void> };
+
+export function VideoPlayerControls({ videoRef, containerRef, levels, level, onLevel, fill, onFill, top }: Props) {
   const [paused, setPaused] = useState(true);
   const [waiting, setWaiting] = useState(false);
   const [time, setTime] = useState(0);
@@ -74,10 +79,18 @@ export function VideoPlayerControls({ videoRef, containerRef, levels, level, onL
   }, [videoRef]);
 
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === containerRef.current);
+    const onChange = () => {
+      const active = document.fullscreenElement === containerRef.current;
+      setFullscreen(active);
+      const orientation = screen.orientation as LockableOrientation | undefined;
+      const v = videoRef.current;
+      // Хэвтээ киног утсанд бүтэн дэлгэц болгоход шууд эргүүлнэ. Компьютер, iPhone үүнийг дэмждэггүй: тэнд татгалзал хэвийн.
+      if (active && v && v.videoWidth > v.videoHeight) void orientation?.lock?.('landscape').catch(() => undefined);
+      else if (!active) orientation?.unlock?.();
+    };
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
-  }, [containerRef]);
+  }, [containerRef, videoRef]);
 
   const wake = useCallback(() => {
     setVisible(true);
@@ -164,6 +177,8 @@ export function VideoPlayerControls({ videoRef, containerRef, levels, level, onL
         else togglePlay();
       }}
     >
+      <div className={cn('absolute inset-x-0 top-0 transition-opacity', shown ? 'opacity-100' : 'pointer-events-none opacity-0')}>{top}</div>
+
       {waiting && <Loader2 className="pointer-events-none absolute left-1/2 top-1/2 size-12 -translate-x-1/2 -translate-y-1/2 animate-spin" aria-label="Ачаалж байна" />}
 
       <div className={cn('pointer-events-none absolute inset-0 flex items-center justify-center gap-6 transition-opacity sm:gap-12', shown ? 'opacity-100' : 'opacity-0')}>
@@ -207,6 +222,7 @@ export function VideoPlayerControls({ videoRef, containerRef, levels, level, onL
                 {levels.map((l) => <option key={l.index} value={l.index}>{l.height}p</option>)}
               </Select>
             )}
+            <button type="button" aria-pressed={fill} aria-label={fill ? 'Зургийг бүтнээр харуулах' : 'Дэлгэц дүүргэх'} title={fill ? 'Зургийг бүтнээр харуулах' : 'Дэлгэц дүүргэх'} className={cn(iconButton, 'size-9')} onClick={() => { onFill(); wake(); }}>{fill ? <Shrink className="size-5" aria-hidden /> : <Expand className="size-5" aria-hidden />}</button>
             <button type="button" aria-label={fullscreen ? 'Бүтэн дэлгэцээс гарах' : 'Бүтэн дэлгэц'} className={cn(iconButton, 'size-9')} onClick={toggleFullscreen}>{fullscreen ? <Minimize className="size-5" aria-hidden /> : <Maximize className="size-5" aria-hidden />}</button>
           </div>
         </div>

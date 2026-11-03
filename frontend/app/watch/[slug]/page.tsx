@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { ArrowLeft } from 'lucide-react';
@@ -11,9 +11,11 @@ import { VideoPlayerControls } from '@/components/video-player-controls';
 import { api, ApiClientError } from '@/lib/api';
 
 const PROGRESS_EVERY_MS = 15_000;
+const FILL_KEY = 'mf_player_fill';
 
 export default function WatchPage() {
   const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -22,11 +24,23 @@ export default function WatchPage() {
   const [levels, setLevels] = useState<{ index: number; height: number }[]>([]);
   const [level, setLevel] = useState(-1);
   const [ready, setReady] = useState(false);
+  const [fill, setFill] = useState(false);
+  // Хуудаснаас гарах үед видео аль хэдийн салгагдсан байдаг: сүүлийн байрлалыг тусад нь хадгална.
+  const position = useRef({ time: 0, duration: 0 });
+
+  useEffect(() => {
+    try { setFill(localStorage.getItem(FILL_KEY) === '1'); } catch { /* хадгалах боломжгүй хөтөч: анхны горимоор */ }
+  }, []);
+  const toggleFill = () => {
+    const next = !fill;
+    setFill(next);
+    try { localStorage.setItem(FILL_KEY, next ? '1' : '0'); } catch { /* зөвхөн энэ удаад хүчинтэй */ }
+  };
 
   const saveProgress = useCallback(() => {
-    const v = videoRef.current;
-    if (!v || !movie || !v.duration || !Number.isFinite(v.duration)) return;
-    void api(`/api/watch-history/${movie.id}`, { method: 'PUT', body: { progressSeconds: Math.floor(v.currentTime), durationSeconds: Math.floor(v.duration) } }).catch(() => undefined);
+    const { time, duration } = position.current;
+    if (!movie || !duration) return;
+    void api(`/api/watch-history/${movie.id}`, { method: 'PUT', body: { progressSeconds: Math.floor(time), durationSeconds: Math.floor(duration) } }).catch(() => undefined);
   }, [movie]);
 
   useEffect(() => {
@@ -87,32 +101,52 @@ export default function WatchPage() {
 
   useEffect(() => {
     const t = setInterval(saveProgress, PROGRESS_EVERY_MS);
-    return () => { clearInterval(t); saveProgress(); };
+    // Утсанд таб хаагдах, өөр апп руу шилжихэд хуудас дахин сэрэхгүй байж болно.
+    const onHide = () => { if (document.visibilityState === 'hidden') saveProgress(); };
+    document.addEventListener('visibilitychange', onHide);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onHide); saveProgress(); };
   }, [saveProgress]);
+
+  // Устгасан киноны хуучин холбоос: replace нь "буцах"-аар дахин энд ирүүлэхгүй.
+  const gone = error?.code === 'NOT_FOUND';
+  useEffect(() => { if (gone) router.replace('/'); }, [gone, router]);
 
   const changeLevel = (v: number) => {
     setLevel(v);
     if (hlsRef.current) hlsRef.current.currentLevel = v;
   };
 
+  // replace: "буцах" дарсны дараа хөтчийн буцах товч киног дахин эхлүүлэхгүй.
+  const titleBar = (
+    <div className="flex items-center gap-3 bg-linear-to-b from-black/70 to-transparent p-3 text-white">
+      <Button asChild variant="ghost" size="icon" aria-label="Буцах"><Link replace href={movie ? `/movies/${movie.slug}` : '/movies'}><ArrowLeft /></Link></Button>
+      <h1 className="line-clamp-1 flex-1 font-semibold">{movie?.title}</h1>
+    </div>
+  );
+
+  if (gone) return <main className="flex min-h-dvh items-center justify-center bg-black"><Spinner className="size-10" /></main>;
   return (
-    <main className="flex min-h-dvh flex-col bg-black">
-      <div className="flex items-center gap-3 p-3">
-        <Button asChild variant="ghost" size="icon" aria-label="Буцах"><Link href={movie ? `/movies/${movie.slug}` : '/movies'}><ArrowLeft /></Link></Button>
-        <h1 className="line-clamp-1 flex-1 font-semibold">{movie?.title}</h1>
-      </div>
+    <main className="relative h-dvh overflow-hidden bg-black">
       {error ? (
-        <div className="m-auto max-w-md p-4">
-          <ErrorState message={error.message} />
-          {(error.code === 'SUBSCRIPTION_REQUIRED' || error.code === 'UNAUTHORIZED') && (
-            <Button asChild className="mt-4 w-full"><Link href={error.code === 'UNAUTHORIZED' ? `/login?next=/watch/${slug}` : '/subscription'}>{error.code === 'UNAUTHORIZED' ? 'Нэвтрэх' : 'Эрх авах'}</Link></Button>
-          )}
-        </div>
+        <>
+          {titleBar}
+          <div className="mx-auto max-w-md p-4">
+            <ErrorState message={error.message} />
+            {(error.code === 'SUBSCRIPTION_REQUIRED' || error.code === 'UNAUTHORIZED') && (
+              <Button asChild className="mt-4 w-full"><Link href={error.code === 'UNAUTHORIZED' ? `/login?next=/watch/${slug}` : '/subscription'}>{error.code === 'UNAUTHORIZED' ? 'Нэвтрэх' : 'Эрх авах'}</Link></Button>
+            )}
+          </div>
+        </>
       ) : (
-        <div ref={playerRef} className="relative flex flex-1 items-center justify-center bg-black">
+        <div ref={playerRef} className="absolute inset-0 flex items-center justify-center bg-black">
           {!ready && <Spinner className="absolute size-10" />}
-          <video ref={videoRef} playsInline className="max-h-[calc(100dvh-4rem)] w-full in-fullscreen:max-h-dvh" onPause={saveProgress} onEnded={saveProgress} />
-          {ready && <VideoPlayerControls videoRef={videoRef} containerRef={playerRef} levels={levels} level={level} onLevel={changeLevel} />}
+          <video
+            ref={videoRef} playsInline
+            className={`absolute inset-0 size-full ${fill ? 'object-cover' : 'object-contain'}`}
+            onTimeUpdate={(e) => { const v = e.currentTarget; if (Number.isFinite(v.duration) && v.duration > 0) position.current = { time: v.currentTime, duration: v.duration }; }}
+            onPause={saveProgress} onEnded={saveProgress}
+          />
+          {ready ? <VideoPlayerControls videoRef={videoRef} containerRef={playerRef} levels={levels} level={level} onLevel={changeLevel} fill={fill} onFill={toggleFill} top={titleBar} /> : <div className="absolute inset-x-0 top-0">{titleBar}</div>}
         </div>
       )}
     </main>

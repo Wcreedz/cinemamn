@@ -37,8 +37,11 @@ export async function probe(file: string, ffprobe = env.FFPROBE_PATH): Promise<P
   const info = JSON.parse(stdout);
   const video = info.streams?.find((s: any) => s.codec_type === 'video');
   if (!video) throw new Error('Файлд видео урсгал олдсонгүй.');
+  // Утасны бичлэг хэвтээ кодлогдож, эргүүлэх тэмдэгтэй хадгалагддаг. FFmpeg эргүүлсэн зургаар ажилладаг тул хэмжээ нь ч эргэсэн байна.
+  const rotation = Number(video.side_data_list?.find((d: any) => d.rotation !== undefined)?.rotation ?? video.tags?.rotate ?? 0);
+  const turned = Math.abs(rotation) % 180 === 90;
   return {
-    width: Number(video.width), height: Number(video.height), duration: Number(info.format?.duration ?? 0),
+    width: Number(turned ? video.height : video.width), height: Number(turned ? video.width : video.height), duration: Number(info.format?.duration ?? 0),
     hasAudio: !!info.streams.some((s: any) => s.codec_type === 'audio'),
   };
 }

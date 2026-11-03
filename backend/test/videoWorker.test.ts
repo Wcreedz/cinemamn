@@ -5,7 +5,7 @@ import path from 'path';
 import { promisify } from 'util';
 import { env } from '../src/config/env';
 import { Movie, Subscription, VideoJob } from '../src/models';
-import { transcode, VideoService } from '../src/services/video.service';
+import { probe, transcode, VideoService } from '../src/services/video.service';
 import { api, login, makeMovie, resetDb, startDb, stopDb, uploadVideo } from './helpers';
 
 const run = promisify(execFile);
@@ -137,6 +137,20 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     const seg = await api().get(`${base}480p/seg_00000.ts`).buffer(true).parse((res, cb) => { const c: Buffer[] = []; res.on('data', (d) => c.push(d)); res.on('end', () => cb(null, Buffer.concat(c))); });
     expect(seg.status).toBe(200);
     expect((seg.body as Buffer)[0]).toBe(0x47); // MPEG-TS sync byte
+  });
+
+  it('эргүүлэх тэмдэгтэй утасны бичлэг сунгагдахгүй, босоо хэвээр гарна', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    const source = path.join(env.VIDEO_DEFAULT_ROOT, 'sample.mp4');
+    const rotated = path.join(env.VIDEO_DEFAULT_ROOT, 'rotated.mp4');
+    await run(env.FFMPEG_PATH, ['-y', '-display_rotation', '90', '-i', source, '-c', 'copy', rotated]);
+    expect((await uploadVideo(admin.agent, movie._id, await fs.readFile(rotated), 'utas.mp4')).status).toBe(202);
+    await VideoService.process((await VideoService.claimNext())!);
+    expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('ready');
+    const output = await probe(path.join(env.VIDEO_DEFAULT_ROOT, 'hls', String(movie._id), '720p', 'seg_00000.ts'));
+    expect([output.width, output.height]).toEqual([404, 720]);
+    expect(await fs.readFile(path.join(env.VIDEO_DEFAULT_ROOT, 'hls', String(movie._id), 'master.m3u8'), 'utf8')).toContain('RESOLUTION=404x720');
   });
 
   async function readyMovie() {
