@@ -53,7 +53,7 @@ function Pay() {
         <CheckCircle2 className="mx-auto size-14 text-success" />
         <h1 className="mt-3 text-xl font-black">Төлбөр амжилттай</h1>
         <p className="mt-1 text-sm text-muted-foreground">{p.planName} идэвхжлээ.</p>
-        <Button asChild className="mt-5"><Link href="/movies">Кино үзэх</Link></Button>
+        <Button asChild className="mt-5"><Link href="/">Кино үзэх</Link></Button>
       </Card>
     );
   }

@@ -25,6 +25,38 @@ describe('Хамгаалалттай тоглуулалт', () => {
   beforeEach(resetDb);
   afterEach(async () => { await fs.rm(env.VIDEO_DEFAULT_ROOT, { recursive: true, force: true }); });
 
+  const playable = (items: { id: string; playable: boolean }[], id: unknown) => items.find((i) => i.id === String(id))?.playable;
+
+  it('жагсаалт бүрт зөвхөн бүрэн боловсруулагдсан кино playable, дотоод зам задрахгүй', async () => {
+    const ready = await makeMovie({ title: 'Хайх кино бэлэн', videoStatus: 'ready', hlsPath: 'hls/a', featured: true });
+    const waiting = await Promise.all((['none', 'uploading', 'queued', 'processing', 'failed'] as const).map((videoStatus) => makeMovie({ title: 'Хайх кино ' + videoStatus, videoStatus, featured: true })));
+    // Файл солигдож буй кино хуучин HLS-ээрээ үзэгдсээр байна.
+    const replacing = await makeMovie({ title: 'Хайх кино солигдож буй', videoStatus: 'processing', hlsPath: 'hls/b', featured: true });
+    for (const url of ['/api/movies?limit=50', '/api/movies/featured', '/api/movies/new', '/api/movies/popular', '/api/search?q=' + encodeURIComponent('Хайх')]) {
+      const { items } = (await api().get(url)).body;
+      expect(playable(items, ready._id)).toBe(true);
+      expect(playable(items, replacing._id)).toBe(true);
+      for (const m of waiting) expect(playable(items, m._id)).toBe(false);
+      expect(JSON.stringify(items)).not.toContain('hls/');
+    }
+  });
+
+  it('үзсэн түүхэд төлөв зөв, боловсруулагдаагүй киног эрхтэй ч үзэж болохгүй', async () => {
+    const replacing = await makeMovie({ videoStatus: 'processing', hlsPath: 'hls/b' });
+    const waiting = await makeMovie({ videoStatus: 'queued' });
+    const { agent, user } = await login();
+    await activeSub(user._id);
+    await agent.put('/api/watch-history/' + replacing._id).send({ progressSeconds: 10, durationSeconds: 100 });
+    await agent.put('/api/watch-history/' + waiting._id).send({ progressSeconds: 10, durationSeconds: 100 });
+    const history = (await agent.get('/api/watch-history')).body.items.map((i: { movie: { id: string; playable: boolean } }) => i.movie);
+    expect(playable(history, replacing._id)).toBe(true);
+    expect(playable(history, waiting._id)).toBe(false);
+    expect(JSON.stringify(history)).not.toContain('hls/');
+    const denied = await agent.post('/api/stream/' + waiting._id + '/token');
+    expect([denied.status, denied.body.error.code]).toEqual([409, 'VIDEO_NOT_READY']);
+    expect(denied.body.error.message).toContain('Тун удахгүй');
+  });
+
   it('нэвтрээгүй хэрэглэгч токен авч чадахгүй', async () => {
     const m = await makeMovie();
     expect((await api().post(`/api/stream/${m._id}/token`)).status).toBe(401);

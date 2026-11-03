@@ -47,7 +47,7 @@ export async function deliver(req: Request, res: Response) {
 
 export async function watchHistory(req: Request, res: Response) {
   const rows = await WatchHistory.find({ userId: req.user!._id }).sort({ lastWatchedAt: -1 }).limit(60)
-    .populate({ path: 'movieId', populate: { path: 'genres' } }).lean();
+    .populate({ path: 'movieId', select: '+hlsPath', populate: { path: 'genres' } }).lean();
   res.json({
     items: rows.filter((r: any) => r.movieId?.isPublished).map((r: any) => ({
       movie: movieSummary(r.movieId), progressSeconds: r.progressSeconds, durationSeconds: r.durationSeconds, completed: r.completed, lastWatchedAt: r.lastWatchedAt,

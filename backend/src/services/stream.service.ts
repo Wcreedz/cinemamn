@@ -19,7 +19,7 @@ export const StreamService = {
     const movie = await Movie.findById(movieId).select('+hlsPath').lean();
     if (!movie || !movie.isPublished) throw notFound('Кино олдсонгүй.');
     if (!(await SubscriptionService.hasAccess(userId))) throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Кино үзэхийн тулд идэвхтэй эрх шаардлагатай.');
-    if (!isPlayable(movie)) throw new AppError(409, 'VIDEO_NOT_READY', 'Энэ киноны видео бэлэн болоогүй байна.');
+    if (!isPlayable(movie)) throw new AppError(409, 'VIDEO_NOT_READY', 'Тун удахгүй. Энэ киноны видео бэлтгэгдэж байна.');
     const { playbackTokenExpiryMinutes } = await VideoConfigurationService.get();
     const expiresAt = new Date(Date.now() + playbackTokenExpiryMinutes * 60_000);
     const session = await PlaybackSession.create({ userId, movieId: movie._id, expiresAt, ipAddress: ip });

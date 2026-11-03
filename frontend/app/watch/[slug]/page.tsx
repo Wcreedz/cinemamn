@@ -119,7 +119,7 @@ export default function WatchPage() {
   // replace: "буцах" дарсны дараа хөтчийн буцах товч киног дахин эхлүүлэхгүй.
   const titleBar = (
     <div className="flex items-center gap-3 bg-linear-to-b from-black/70 to-transparent p-3 text-white">
-      <Button asChild variant="ghost" size="icon" aria-label="Буцах"><Link replace href={movie ? `/movies/${movie.slug}` : '/movies'}><ArrowLeft /></Link></Button>
+      <Button asChild variant="ghost" size="icon" aria-label="Буцах"><Link replace href={movie ? `/movies/${movie.slug}` : '/'}><ArrowLeft /></Link></Button>
       <h1 className="line-clamp-1 flex-1 font-semibold">{movie?.title}</h1>
     </div>
   );

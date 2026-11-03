@@ -14,6 +14,13 @@ const config: NextConfig = {
       { source: '/v/:path*', destination: `${apiUrl}/v/:path*` },
     ];
   },
+  async redirects() {
+    // Хуучин холбоос, хадгалсан хаяг ажилласаар байна. Query (?category=) автоматаар дагаж очно.
+    return [
+      { source: '/movies', destination: '/', permanent: false },
+      { source: '/categories', destination: '/', permanent: false },
+    ];
+  },
   async headers() {
     return [{
       source: '/(.*)',

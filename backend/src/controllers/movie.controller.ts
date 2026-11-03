@@ -13,7 +13,7 @@ const mediaPath = (url?: string) => url?.replace(/^https?:\/\/[^/]+(\/media\/)/,
 
 export const movieSummary = (m: any) => ({
   id: String(m._id), title: m.title, slug: m.slug, poster: mediaPath(m.poster), backdrop: mediaPath(m.backdrop), description: m.description,
-  releaseYear: m.releaseYear, duration: m.duration, featured: m.featured, viewCount: m.viewCount,
+  releaseYear: m.releaseYear, duration: m.duration, featured: m.featured, viewCount: m.viewCount, playable: isPlayable(m),
   genres: (m.genres ?? []).filter((g: any) => g?.name).map(categoryView),
 });
 export const movieDetail = (m: any) => ({
@@ -22,7 +22,7 @@ export const movieDetail = (m: any) => ({
 });
 
 const SORTS = { new: { createdAt: -1 }, popular: { viewCount: -1 }, title: { title: 1 } } as const;
-const published = () => Movie.find({ isPublished: true }).populate('genres');
+const published = () => Movie.find({ isPublished: true }).select('+hlsPath').populate('genres');
 
 export async function listMovies(req: Request, res: Response) {
   const q = parse(movieQuery, req.query);
@@ -34,7 +34,7 @@ export async function listMovies(req: Request, res: Response) {
   }
   if (q.year) filter.releaseYear = q.year;
   const [items, total] = await Promise.all([
-    Movie.find(filter).populate('genres').sort(SORTS[q.sort]).skip((q.page - 1) * q.limit).limit(q.limit).lean(),
+    Movie.find(filter).select('+hlsPath').populate('genres').sort(SORTS[q.sort]).skip((q.page - 1) * q.limit).limit(q.limit).lean(),
     Movie.countDocuments(filter),
   ]);
   res.json(paged(items.map(movieSummary), total, q.page, q.limit));
@@ -68,6 +68,6 @@ export async function search(req: Request, res: Response) {
     filter = { isPublished: true, title: { $regex: escapeRegex(q), $options: 'i' } };
     total = await Movie.countDocuments(filter);
   }
-  const items = await Movie.find(filter).populate('genres').skip((page - 1) * limit).limit(limit).lean();
+  const items = await Movie.find(filter).select('+hlsPath').populate('genres').skip((page - 1) * limit).limit(limit).lean();
   res.json(paged(items.map(movieSummary), total, page, limit));
 }

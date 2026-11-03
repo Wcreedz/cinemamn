@@ -2,15 +2,13 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Clapperboard, Crown, Film, Home, LayoutGrid, LogOut, Search, Shield, User } from 'lucide-react';
+import { Clapperboard, Crown, Film, LogOut, Search, Shield, User } from 'lucide-react';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const LINKS = [
-  { href: '/', label: 'Нүүр', icon: Home },
-  { href: '/movies', label: 'Кино', icon: Film },
-  { href: '/categories', label: 'Ангилал', icon: LayoutGrid },
+  { href: '/', label: 'Кино', icon: Film },
   { href: '/my-movies', label: 'Миний кино', icon: Clapperboard },
   { href: '/subscription', label: 'Миний эрх', icon: Crown },
   { href: '/profile', label: 'Профайл', icon: User },
@@ -43,7 +41,7 @@ export function SiteNav() {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => goSearch(value), SEARCH_DELAY_MS);
   };
-  const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+  const isActive = (href: string) => (href === '/' ? path === '/' || path.startsWith('/movies/') : path.startsWith(href));
   const siteName = settings?.general.siteName ?? 'MongolFlix';
 
   return (
@@ -77,7 +75,7 @@ export function SiteNav() {
           ))}
         </div>
       </header>
-      <nav aria-label="Гар утасны цэс" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <nav aria-label="Гар утасны цэс" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {LINKS.map((l) => (
           <Link key={l.href} href={l.href} aria-current={isActive(l.href) ? 'page' : undefined}
             className={cn('flex flex-col items-center gap-1 py-2 text-[10px] font-medium text-muted-foreground', isActive(l.href) && 'text-primary')}>

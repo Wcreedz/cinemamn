@@ -2,14 +2,14 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Crown, Play, Youtube } from 'lucide-react';
+import { Clock, Crown, Play, Youtube } from 'lucide-react';
 import type { MovieDetail, PlansResponse } from '@mongolflix/shared';
 import { Poster } from '@/components/movie-card';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
-import { authEntry } from '@/lib/auth-entry';
+import { authHref } from '@/lib/auth-entry';
 import { money, runtime } from '@/lib/utils';
 
 export default function MovieDetailPage() {
@@ -25,6 +25,7 @@ export default function MovieDetailPage() {
   if (error || !m) return <ErrorState message={error ?? 'Кино олдсонгүй.'} onRetry={reload} />;
   const canWatch = settings?.subscription.paymentRequired === false ? !!user : !!access?.hasAccess;
   const plan = plans.data?.plans[0];
+  const comingSoon = m.videoStatus !== 'ready';
   return (
     <article>
       <div className="relative -mx-4 -mt-4 h-[40vh] overflow-hidden bg-muted md:h-[55vh]">
@@ -41,20 +42,21 @@ export default function MovieDetailPage() {
             {m.genres.map((g) => <Badge key={g.id}>{g.name}</Badge>)}
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
-            {canWatch ? (
-              <Button asChild size="lg" disabled={m.videoStatus !== 'ready'}><Link href={`/watch/${m.slug}`}><Play />Кино үзэх</Link></Button>
+            {comingSoon ? (
+              <span className="inline-flex h-12 items-center gap-2 rounded-md bg-muted px-6 text-base font-semibold text-muted-foreground"><Clock className="size-4" />Тун удахгүй</span>
+            ) : canWatch ? (
+              <Button asChild size="lg"><Link href={`/watch/${m.slug}`}><Play />Кино үзэх</Link></Button>
             ) : (
-              <Button asChild size="lg"><Link href={user ? '/subscription' : authEntry(`/movies/${m.slug}`)}><Crown />{user ? 'Эрх авах' : 'Нэвтэрч үзэх'}</Link></Button>
+              <Button asChild size="lg"><Link href={user ? '/subscription' : authHref('/register', `/movies/${m.slug}`)}><Crown />{user ? 'Эрх авах' : 'Нэвтэрч үзэх'}</Link></Button>
             )}
             {m.trailerUrl && <Button asChild size="lg" variant="secondary"><a href={m.trailerUrl} target="_blank" rel="noreferrer noopener"><Youtube />Трейлер</a></Button>}
           </div>
-          {!canWatch && (
+          {!comingSoon && !canWatch && (
             <Card className="mt-5 max-w-lg p-4">
               <p className="font-semibold">Энэ киног үзэхийн тулд идэвхтэй эрх шаардлагатай.</p>
               {plan && <p className="mt-1 text-sm text-muted-foreground">{plan.name}: {money(plan.price, plan.currency)} / {plan.durationDays} хоног. Бүх кино багтана.</p>}
             </Card>
           )}
-          {m.videoStatus !== 'ready' && canWatch && <p className="mt-3 text-sm text-warning">Видео бэлтгэгдэж байна.</p>}
           {m.description && <p className="mt-6 max-w-3xl whitespace-pre-line leading-relaxed text-gray-300">{m.description}</p>}
           <dl className="mt-6 grid max-w-2xl grid-cols-[6rem_1fr] gap-y-2 text-sm">
             {m.director && <><dt className="text-muted-foreground">Найруулагч</dt><dd>{m.director}</dd></>}
