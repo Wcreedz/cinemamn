@@ -29,7 +29,6 @@ export default function MovieDetailPage() {
         <Poster src={m.poster} title={m.title} className="aspect-[2/3] w-36 shrink-0 rounded-lg object-cover shadow-2xl md:w-60" />
         <div className="min-w-0 flex-1 md:pt-24">
           <h1 className="text-3xl font-black md:text-4xl">{m.title}</h1>
-          {m.originalTitle && <p className="text-sm text-muted-foreground">{m.originalTitle}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {m.releaseYear && <span>{m.releaseYear}</span>}
             {m.duration ? <span>{runtime(m.duration)}</span> : null}

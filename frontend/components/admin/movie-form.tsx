@@ -63,7 +63,7 @@ function SaveProgress({ task }: { task: SaveTask }) {
   );
 }
 
-const blank = { title: '', originalTitle: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true, featured: false };
+const blank = { title: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true, featured: false };
 
 const fileSize = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`);
 
@@ -108,7 +108,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   const cats = useApi<{ items: Category[] }>('/api/admin/categories');
   const [f, setF] = useState(() => movie ? {
     ...blank, title: movie.title, isPublished: movie.isPublished, featured: movie.featured,
-    originalTitle: movie.originalTitle ?? '', poster: movie.poster ?? '', backdrop: movie.backdrop ?? '', trailerUrl: movie.trailerUrl ?? '',
+    poster: movie.poster ?? '', backdrop: movie.backdrop ?? '', trailerUrl: movie.trailerUrl ?? '',
     description: movie.description ?? '', genres: movie.genres.map((g) => g.id),
   } : blank);
   // Файл байршуулахад алдаа гарвал дахин дарахад шинэ кино биш, энэ кино шинэчлэгдэнэ.
@@ -180,7 +180,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     });
     const nextStep = () => setTask((t) => t && { ...t, current: t.current + 1 });
     const body = {
-      title: f.title, originalTitle: f.originalTitle || undefined, description: f.description, poster: f.poster || undefined, backdrop: f.backdrop || undefined,
+      title: f.title, description: f.description, poster: f.poster || undefined, backdrop: f.backdrop || undefined,
       trailerUrl: f.trailerUrl, genres: f.genres, isPublished: f.isPublished, featured: f.featured,
     };
     try {
@@ -252,7 +252,6 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
         </Panel>
         <Panel className="space-y-4">
           <Field label="Гарчиг" id="title"><Input id="title" required value={f.title} onChange={(e) => set('title', e.target.value)} /></Field>
-          <Field label="Эх гарчиг" id="orig"><Input id="orig" value={f.originalTitle} onChange={(e) => set('originalTitle', e.target.value)} /></Field>
           <Field label="Тайлбар" id="desc"><Textarea id="desc" value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
           <Field label="Трейлер URL"><Input type="url" value={f.trailerUrl} onChange={(e) => set('trailerUrl', e.target.value)} /></Field>
           <div>
