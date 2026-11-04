@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { promises as fs } from 'fs';
 import { env } from '../src/config/env';
-import { AdminLog, Category, Movie, Payment, Subscription, User, VideoJob } from '../src/models';
+import { AdminLog, Category, Movie, Payment, SiteVisit, Subscription, User, VideoJob } from '../src/models';
 import { VideoService } from '../src/services/video.service';
+import { visitDay, VisitService } from '../src/services/visit.service';
 import { api, login, makeMovie, resetDb, startDb, stopDb, uploadVideo } from './helpers';
 
 const movieBody = (over = {}) => ({ title: 'Шинэ кино', slug: 'shine-kino', description: 'тайлбар', isPublished: true, genres: [], cast: ['A'], ...over });
@@ -222,6 +223,44 @@ describe('Админ удирдлага', () => {
     expect((await s.agent.post(`/api/admin/payments/${p._id}/refund`).send({ note: 'Хэрэглэгчийн хүсэлт' })).status).toBe(200);
     expect((await Subscription.findById(sub._id).lean())!.status).toBe('cancelled');
     expect((await Payment.findById(p._id).lean())!.status).toBe('refunded');
+  });
+
+  it('сайтын зочныг төхөөрөмжөөр нь давхардуулахгүй тоолно', async () => {
+    const [a, b] = ['a'.repeat(32), 'b'.repeat(32)];
+    const counts = async () => (await (await login('admin')).agent.get('/api/admin/dashboard')).body.visitors;
+    expect(await counts()).toEqual({ today: 0, month: 0, total: 0 });
+
+    // Нэвтрээгүй зочин тоологдоно. Өдөрт олон удаа, зэрэг орсон ч нэг л бичлэг.
+    const sent = await Promise.all([a, a, a, b].map((visitorId) => api().post('/api/visits').send({ visitorId })));
+    expect(sent.map((r) => r.status)).toEqual([204, 204, 204, 204]);
+    expect(await SiteVisit.countDocuments()).toBe(2);
+    expect(await counts()).toEqual({ today: 2, month: 2, total: 2 });
+
+    // Буруу утга бүртгэгдэхгүй, хэн ч зочны тоог уншиж чадахгүй.
+    const before = await SiteVisit.countDocuments();
+    for (const body of [{}, { visitorId: 'x' }, { visitorId: { $ne: '' } }, { visitorId: 'A'.repeat(32) }]) {
+      expect((await api().post('/api/visits').send(body)).status).toBe(400);
+    }
+    expect(await SiteVisit.countDocuments()).toBe(before);
+    expect((await api().get('/api/admin/dashboard')).status).toBe(401);
+  });
+
+  it('өдөр, сар, нийт зочныг давхардуулахгүй тооцно', async () => {
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((x) => x.repeat(32));
+    await SiteVisit.create([
+      { day: '2026-11-15', visitorId: a }, { day: '2026-11-15', visitorId: b },
+      { day: '2026-11-14', visitorId: a }, { day: '2026-11-01', visitorId: c },
+      { day: '2026-10-31', visitorId: a }, { day: '2026-10-31', visitorId: d },
+    ]);
+    expect(await VisitService.counts(new Date('2026-11-15T04:00:00Z'))).toEqual({ today: 2, month: 3, total: 4 });
+    // Улаанбаатарын цагаар дараагийн сар эхэлсэн мөч.
+    expect(await VisitService.counts(new Date('2026-11-30T16:00:00Z'))).toEqual({ today: 0, month: 0, total: 4 });
+  });
+
+  it('зочны өдрийг Улаанбаатарын цагаар тооцно', () => {
+    expect(visitDay(new Date('2026-11-04T15:59:00Z'))).toBe('2026-11-04');
+    expect(visitDay(new Date('2026-11-04T16:00:00Z'))).toBe('2026-11-05');
+    expect(visitDay(new Date('2026-12-31T16:30:00Z'))).toBe('2027-01-01');
   });
 
   it('dashboard тоо зөв гаргана, кино хайлт ажиллана', async () => {

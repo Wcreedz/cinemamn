@@ -7,6 +7,7 @@ import { useApi } from '@/hooks/use-api';
 import { dateTime, money } from '@/lib/utils';
 
 interface Dashboard {
+  visitors: { today: number; month: number; total: number };
   totalUsers: number; activeSubscribers: number; expiredSubscribers: number; totalPayments: number;
   monthlyRevenue: { _id: string; total: number; count: number }[];
   recentPayments: (PaymentView & { phone?: string })[];
@@ -20,11 +21,11 @@ export default function AdminDashboard() {
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading || !d) return <Skeleton className="h-96" />;
   const revenue = d.monthlyRevenue.map((r) => money(r.total, r._id)).join(', ') || money(0);
-  const stats = [['Нийт хэрэглэгч', d.totalUsers], ['Идэвхтэй эрхтэй', d.activeSubscribers], ['Эрх дууссан', d.expiredSubscribers], ['Нийт төлбөр', d.totalPayments], ['Энэ сарын орлого', revenue]] as const;
+  const stats = [['Өнөөдрийн зочин', d.visitors.today], ['Энэ сарын зочин', d.visitors.month], ['Нийт зочин', d.visitors.total], ['Нийт хэрэглэгч', d.totalUsers], ['Идэвхтэй эрхтэй', d.activeSubscribers], ['Эрх дууссан', d.expiredSubscribers], ['Нийт төлбөр', d.totalPayments], ['Энэ сарын орлого', revenue]] as const;
   return (
     <>
       <PageHeader title="Хянах самбар" subtitle="Системийн ерөнхий үзүүлэлт" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map(([k, v]) => <Panel key={k} className="p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{k}</p><p className="mt-2 text-2xl font-black">{v}</p></Panel>)}
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

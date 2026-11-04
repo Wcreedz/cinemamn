@@ -3,6 +3,7 @@ import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicSettings, PublicUser, SubscriptionMe } from '@mongolflix/shared';
 import { api, isAdminPath, refreshSession, setSiteActsAsAdmin } from '@/lib/api';
+import { reportVisit } from '@/lib/visit';
 
 interface AppState {
   user: PublicUser | null;
@@ -69,6 +70,14 @@ export function Providers({ children }: { children: ReactNode }) {
     if (!user) { setAccess(null); return; }
     api<SubscriptionMe>('/api/subscriptions/me').then(setAccess).catch(() => setAccess(null));
   }, [user]);
+
+  // Сесс тодорхой болсны дараа нэг удаа: сайтаа шалгаж буй админыг зочинд тоолохгүй.
+  const visitSent = useRef(false);
+  useEffect(() => {
+    if (area !== 'site' || loading || visitSent.current || (user && user.role !== 'user')) return;
+    visitSent.current = true;
+    reportVisit();
+  }, [area, loading, user]);
 
   const logout = useCallback(async () => {
     await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined);

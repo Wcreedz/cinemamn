@@ -6,7 +6,7 @@ Mongoose 6 хувилбарыг санаатай сонгосон: `quickqpaypac
 
 ## Цуглуулгууд
 
-`users`, `refresh_sessions` (TTL), `categories`, `movies` (text index), `subscriptions`, `payments`, `watch_history`, `playback_sessions` (TTL), `admin_logs`, `system_settings`, `video_jobs`. Багцын цуглуулгууд: `QpayKhariltsagch`, `QuickQpayObject`, `token`.
+`users`, `refresh_sessions` (TTL), `categories`, `movies` (text index), `subscriptions`, `payments`, `watch_history`, `playback_sessions` (TTL), `site_visits`, `admin_logs`, `system_settings`, `video_jobs`. Багцын цуглуулгууд: `QpayKhariltsagch`, `QuickQpayObject`, `token`.
 
 Схем, индексүүд: [backend/src/models/index.ts](../backend/src/models/index.ts).
 

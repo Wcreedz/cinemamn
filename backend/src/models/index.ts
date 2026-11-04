@@ -194,6 +194,15 @@ playbackSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
 playbackSchema.index({ userId: 1, movieId: 1 });
 export const PlaybackSession = model('PlaybackSession', playbackSchema);
 
+// ---------- SiteVisit (төхөөрөмж бүр өдөрт нэг бичлэг; IP, хэрэглэгчийг холбохгүй) ----------
+const siteVisitSchema = new Schema({
+  day: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ },
+  visitorId: { type: String, required: true },
+}, { collection: 'site_visits', timestamps: { createdAt: true, updatedAt: false } });
+siteVisitSchema.index({ day: 1, visitorId: 1 }, { unique: true });
+siteVisitSchema.index({ visitorId: 1 });
+export const SiteVisit = model('SiteVisit', siteVisitSchema);
+
 // ---------- AdminLog ----------
 const adminLogSchema = new Schema({
   adminId: { ...ref('User'), required: true },

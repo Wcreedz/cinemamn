@@ -62,3 +62,5 @@ export const userStatusSchema = z.object({ status: z.enum(['active', 'blocked'])
 export const adminCreateSchema = z.object({ email: emailField, phone: phoneField, password: passwordField.optional(), name: z.string().trim().max(80).default(''), role: z.enum(['admin', 'superadmin']) });
 export const adminRoleSchema = z.object({ role: z.enum(['user', 'admin', 'superadmin']) });
 export const userPasswordSchema = z.object({ password: passwordField });
+
+export const visitSchema = z.object({ visitorId: z.string().regex(/^[a-f0-9]{32}$/) });

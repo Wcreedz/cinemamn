@@ -12,6 +12,7 @@ import { SubscriptionService } from '../services/subscription.service';
 import { VideoService } from '../services/video.service';
 import { VideoConfigurationService } from '../services/videoConfiguration.service';
 import { VideoUploadService } from '../services/videoUpload.service';
+import { VisitService } from '../services/visit.service';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors';
 import { escapeRegex, objectId, paged, pageQuery, parse, sortFrom } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
@@ -24,7 +25,7 @@ const idParam = (req: Request, name = 'id') => new Types.ObjectId(parse(objectId
 export async function dashboard(_req: Request, res: Response) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const [totalUsers, activeIds, everSubscribed, totalPayments, revenue, recent, topMovies, video] = await Promise.all([
+  const [totalUsers, activeIds, everSubscribed, totalPayments, revenue, recent, topMovies, video, visitors] = await Promise.all([
     User.countDocuments(),
     Subscription.distinct('userId', { status: 'active', startedAt: { $lte: now }, expiresAt: { $gt: now } }),
     Subscription.distinct('userId'),
@@ -33,9 +34,10 @@ export async function dashboard(_req: Request, res: Response) {
     Payment.find().sort({ createdAt: -1 }).limit(10).populate('userId', 'phone').lean(),
     Movie.find().sort({ viewCount: -1 }).limit(5).select('title slug viewCount').lean(),
     Movie.aggregate([{ $group: { _id: '$videoStatus', count: { $sum: 1 } } }]),
+    VisitService.counts(now),
   ]);
   res.json({
-    totalUsers, activeSubscribers: activeIds.length, expiredSubscribers: Math.max(everSubscribed.length - activeIds.length, 0), totalPayments,
+    visitors, totalUsers, activeSubscribers: activeIds.length, expiredSubscribers: Math.max(everSubscribed.length - activeIds.length, 0), totalPayments,
     monthlyRevenue: revenue, recentPayments: recent.map((p: any) => ({ ...PaymentService.view(p), phone: p.userId?.phone })),
     topMovies: topMovies.map((m: any) => ({ id: String(m._id), title: m.title, slug: m.slug, viewCount: m.viewCount })),
     videoStatus: Object.fromEntries(video.map((v: any) => [v._id, v.count])),

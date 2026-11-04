@@ -8,6 +8,7 @@ import * as payments from '../controllers/payment.controller';
 import * as settings from '../controllers/settings.controller';
 import * as stream from '../controllers/stream.controller';
 import * as subs from '../controllers/subscription.controller';
+import * as visits from '../controllers/visit.controller';
 import { optionalAuth, requireAdmin, requireAuth, requireSuperadmin } from '../middleware/auth';
 import { CHUNK_BYTES } from '../services/videoUpload.service';
 import { authLimiter } from '../middleware/security';
@@ -33,6 +34,9 @@ api.post('/auth/change-password', authLimiter, requireAuth, auth.changePassword)
 
 // Нийтийн тохиргоо
 api.get('/settings/public', settings.publicSettings);
+
+// Сайтын зочин
+api.post('/visits', visits.record);
 
 // Кино
 api.get('/movies', movies.listMovies);
