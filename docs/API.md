@@ -10,7 +10,7 @@
 
 **Төлбөр**: `POST /api/qpayGargaya { planCode }`, `GET|POST /api/qpaycallback/:baiguullagiinId/:zakhialgiinDugaar`, `GET /api/payments/:id`, `POST /api/payments/:id/check`, `GET /api/payments/history`. Хөгжүүлэлтэд л: `POST /api/payments/:id/dev-simulate`
 
-**Тоглуулалт**: `POST /api/stream/:movieId/token`, `GET /api/stream/:movieId/manifest`, `GET /api/watch-history`, `PUT /api/watch-history/:movieId`
+**Тоглуулалт**: `POST /api/stream/:movieId/token`, `GET /api/stream/:movieId/manifest`, `GET /api/watch-history?completed=&page=&limit=`, `PUT /api/watch-history/:movieId`
 
 **Нийтийн тохиргоо**: `GET /api/settings/public`
 

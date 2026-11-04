@@ -6,14 +6,16 @@ import { PageHeader, Table } from '@/components/admin/ui';
 import { Select } from '@/components/ui/input';
 import { Badge, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
+import { usePagination } from '@/hooks/use-pagination';
 import { date, money } from '@/lib/utils';
 
 type Row = SubscriptionView & { phone?: string; userId: string; note?: string };
 
 export default function AdminSubscriptions() {
   const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const { data, error, loading, reload } = useApi<Paginated<Row>>(`/api/admin/subscriptions?page=${page}${status ? `&status=${status}` : ''}`);
+  const pager = usePagination();
+  const { setPage } = pager;
+  const { data, error, loading, reload } = useApi<Paginated<Row>>(`/api/admin/subscriptions?${pager.query}${status ? `&status=${status}` : ''}`);
   return (
     <>
       <PageHeader title="Эрхүүд" subtitle="Сунгахдаа хэрэглэгчийн хуудас руу орно" />
@@ -22,7 +24,7 @@ export default function AdminSubscriptions() {
       </Select>
       {error ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : (
         <>
-          <Table head={['Утас', 'Багц', 'Дүн', 'Төлөв', 'Эхлэх', 'Дуусах', 'Тэмдэглэл']} paging={data ?? undefined} onPage={setPage}>
+          <Table head={['Утас', 'Багц', 'Дүн', 'Төлөв', 'Эхлэх', 'Дуусах', 'Тэмдэглэл']} paging={data ?? undefined} pager={pager}>
             {data?.items.map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3"><Link href={`/admin/users/${s.userId}`} className="font-semibold text-primary hover:underline">{s.phone}</Link></td>

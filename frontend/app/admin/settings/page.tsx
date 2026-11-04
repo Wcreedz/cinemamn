@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/admin/ui';
 import { ErrorState, Skeleton } from '@/components/ui/misc';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApi } from '@/hooks/use-api';
+import { usePagination } from '@/hooks/use-pagination';
 
 const TABS = [
   ['general', 'Ерөнхий'], ['subscription', 'Эрхийн багц'], ['payment', 'Төлбөр'],
@@ -14,10 +15,10 @@ const TABS = [
 ] as const;
 
 function History() {
-  const [page, setPage] = useState(1);
-  const { data, error, reload } = useApi<Paginated<LogRow>>(`/api/admin/settings/history?page=${page}`);
+  const pager = usePagination();
+  const { data, error, reload } = useApi<Paginated<LogRow>>(`/api/admin/settings/history?${pager.query}`);
   if (error) return <ErrorState message={error} onRetry={reload} />;
-  return <LogTable data={data ?? undefined} onPage={setPage} />;
+  return <LogTable data={data ?? undefined} pager={pager} />;
 }
 
 export default function AdminSettingsPage() {

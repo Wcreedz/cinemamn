@@ -3,19 +3,21 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Category, MovieSummary, Paginated } from '@mongolflix/shared';
 import { MovieGrid, MovieGridSkeleton } from '@/components/movie-card';
-import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
 import { EmptyState, ErrorState } from '@/components/ui/misc';
+import { Pagination } from '@/components/ui/pagination';
 import { useApi } from '@/hooks/use-api';
+import { usePagination } from '@/hooks/use-pagination';
 
 function Catalog() {
   const params = useSearchParams();
   const router = useRouter();
   const category = params.get('category') ?? '';
   const [sort, setSort] = useState('new');
-  const [page, setPage] = useState(1);
+  const pager = usePagination();
+  const { setPage } = pager;
   const cats = useApi<{ items: Category[] }>('/api/categories');
-  const { data, error, loading, reload } = useApi<Paginated<MovieSummary>>(`/api/movies?page=${page}&sort=${sort}${category ? `&category=${category}` : ''}`);
+  const { data, error, loading, reload } = useApi<Paginated<MovieSummary>>(`/api/movies?${pager.query}&sort=${sort}${category ? `&category=${category}` : ''}`);
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -33,13 +35,7 @@ function Catalog() {
       {error ? <ErrorState message={error} onRetry={reload} /> : loading ? <MovieGridSkeleton /> : !data?.items.length ? <EmptyState title="Кино олдсонгүй" /> : (
         <>
           <MovieGrid movies={data.items} />
-          {data.pages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Өмнөх</Button>
-              <span className="text-sm text-muted-foreground">{page} / {data.pages}</span>
-              <Button variant="secondary" size="sm" disabled={page >= data.pages} onClick={() => setPage(page + 1)}>Дараах</Button>
-            </div>
-          )}
+          <Pagination paging={data} pager={pager} className="mt-6" />
         </>
       )}
     </>

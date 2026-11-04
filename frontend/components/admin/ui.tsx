@@ -1,6 +1,8 @@
 'use client';
-import { Children, cloneElement, isValidElement, useState, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, type ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
+import { Pagination, type Paging } from '@/components/ui/pagination';
+import { usePagination, type Pager } from '@/hooks/use-pagination';
 import { cn } from '@/lib/utils';
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
@@ -32,40 +34,14 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 export function NumberInput({ value, onChange, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & { value: number; onChange: (n: number) => void }) {
   return <Input type="number" value={Number.isNaN(value) ? '' : value} onChange={(e) => onChange(e.target.valueAsNumber)} {...props} />;
 }
-interface Paging { page: number; limit: number; pages: number; total: number }
-
-const LOCAL_PAGE_SIZE = 20;
-
-// 1 … 4 5 6 … 12
-function pageNumbers(page: number, pages: number) {
-  const wanted = [...new Set([1, page - 1, page, page + 1, pages])].filter((p) => p >= 1 && p <= pages).sort((a, b) => a - b);
-  return wanted.flatMap((p, i) => (i > 0 && p - wanted[i - 1] > 1 ? [null, p] : [p]));
-}
-
-function Pager({ page, pages, total, onPage }: { page: number; pages: number; total: number; onPage: (p: number) => void }) {
-  const button = 'h-8 min-w-8 cursor-pointer rounded-md border bg-card px-2 text-xs font-semibold hover:bg-accent disabled:pointer-events-none disabled:opacity-50';
-  return (
-    <nav aria-label="Хуудаслалт" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">Нийт {total}</span>
-      <div className="flex flex-wrap items-center gap-1">
-        <button type="button" className={button} disabled={page <= 1} onClick={() => onPage(page - 1)}>Өмнөх</button>
-        {pageNumbers(page, Math.max(pages, 1)).map((p, i) => (p === null
-          ? <span key={`gap-${i}`} className="px-1 text-muted-foreground">…</span>
-          : <button type="button" key={p} aria-current={p === page ? 'page' : undefined} className={cn(button, p === page && 'border-primary bg-accent text-primary')} onClick={() => onPage(p)}>{p}</button>))}
-        <button type="button" className={button} disabled={page >= pages} onClick={() => onPage(page + 1)}>Дараах</button>
-      </div>
-    </nav>
-  );
-}
-
 // Бүх жагсаалт энд дугаарлагдаж, хуудаслагдана. paging өгөөгүй бол серверээс бүгдээрээ ирсэн мөрүүдийг энд хуваана.
-export function Table({ head, paging, onPage, children }: { head: ReactNode[]; paging?: Paging; onPage?: (p: number) => void; children: ReactNode }) {
+export function Table({ head, paging, pager, children }: { head: ReactNode[]; paging?: Paging; pager?: Pager; children: ReactNode }) {
   const rows = Children.toArray(children);
-  const [localPage, setLocalPage] = useState(1);
-  const limit = paging?.limit ?? LOCAL_PAGE_SIZE;
+  const local = usePagination();
+  const limit = paging?.limit ?? local.limit;
   const pages = paging?.pages ?? Math.ceil(rows.length / limit);
   // Мөр устаж хуудас багассан бол хоосон хуудас үлдэхгүй.
-  const page = paging?.page ?? Math.min(localPage, Math.max(pages, 1));
+  const page = paging?.page ?? Math.min(local.page, Math.max(pages, 1));
   const first = (page - 1) * limit;
   const shown = paging ? rows : rows.slice(first, first + limit);
   return (
@@ -80,7 +56,7 @@ export function Table({ head, paging, onPage, children }: { head: ReactNode[]; p
           </tbody>
         </table>
       </div>
-      <Pager page={page} pages={pages} total={paging?.total ?? rows.length} onPage={paging ? (onPage ?? (() => undefined)) : setLocalPage} />
+      <Pagination paging={{ page, limit, pages, total: paging?.total ?? rows.length }} pager={paging && pager ? pager : local} />
     </>
   );
 }

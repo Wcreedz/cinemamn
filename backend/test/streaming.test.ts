@@ -41,6 +41,26 @@ describe('Хамгаалалттай тоглуулалт', () => {
     }
   });
 
+  it('үзсэн түүх хуудаслагдаж, дууссан эсэхээр шүүгдэж, нийтлэгдээгүй кино тоонд орохгүй', async () => {
+    const { agent } = await login();
+    const watch = (m: { _id: unknown }, progressSeconds: number) => agent.put(`/api/watch-history/${m._id}`).send({ progressSeconds, durationSeconds: 100 });
+    for (let i = 0; i < 3; i++) await watch(await makeMovie(), 10);
+    await watch(await makeMovie(), 99);
+    const hidden = await makeMovie();
+    await watch(hidden, 10);
+    await Movie.updateOne({ _id: hidden._id }, { $set: { isPublished: false } });
+
+    const first = (await agent.get('/api/watch-history?completed=false&page=1&limit=2')).body;
+    expect(first).toMatchObject({ total: 3, pages: 2, page: 1, limit: 2 });
+    expect(first.items).toHaveLength(2);
+    const second = (await agent.get('/api/watch-history?completed=false&page=2&limit=2')).body;
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0].movie.id).not.toBe(first.items[0].movie.id);
+    expect((await agent.get('/api/watch-history?completed=true')).body.total).toBe(1);
+    expect((await agent.get('/api/watch-history')).body.total).toBe(4);
+    expect((await agent.get('/api/watch-history?completed=maybe')).status).toBe(400);
+  });
+
   it('үзсэн түүхэд төлөв зөв, боловсруулагдаагүй киног эрхтэй ч үзэж болохгүй', async () => {
     const replacing = await makeMovie({ videoStatus: 'processing', hlsPath: 'hls/b' });
     const waiting = await makeMovie({ videoStatus: 'queued' });

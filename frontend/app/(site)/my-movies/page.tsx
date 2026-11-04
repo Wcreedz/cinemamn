@@ -1,9 +1,11 @@
 'use client';
-import type { WatchHistoryItem } from '@mongolflix/shared';
+import type { Paginated, WatchHistoryItem } from '@mongolflix/shared';
 import { AuthGate } from '@/components/auth-gate';
 import { MovieCard, MovieGridSkeleton } from '@/components/movie-card';
 import { EmptyState, ErrorState } from '@/components/ui/misc';
+import { Pagination } from '@/components/ui/pagination';
 import { useApi } from '@/hooks/use-api';
+import { usePagination } from '@/hooks/use-pagination';
 import { runtime } from '@/lib/utils';
 
 const GRID = 'grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6';
@@ -15,24 +17,28 @@ function ContinueCard({ item }: { item: WatchHistoryItem }) {
 }
 
 function History() {
-  const { data, error, loading, reload } = useApi<{ items: WatchHistoryItem[] }>('/api/watch-history');
-  if (error) return <ErrorState message={error} onRetry={reload} />;
-  if (loading) return <MovieGridSkeleton />;
-  if (!data?.items.length) return <EmptyState title="Та одоогоор кино үзээгүй байна" />;
-  const unfinished = data.items.filter((i) => !i.completed);
-  const finished = data.items.filter((i) => i.completed);
+  const unfinishedPager = usePagination();
+  const finishedPager = usePagination();
+  const unfinished = useApi<Paginated<WatchHistoryItem>>(`/api/watch-history?completed=false&${unfinishedPager.query}`);
+  const finished = useApi<Paginated<WatchHistoryItem>>(`/api/watch-history?completed=true&${finishedPager.query}`);
+  const error = unfinished.error ?? finished.error;
+  if (error) return <ErrorState message={error} onRetry={() => { void unfinished.reload(); void finished.reload(); }} />;
+  if (!unfinished.data || !finished.data) return <MovieGridSkeleton />;
+  if (!unfinished.data.total && !finished.data.total) return <EmptyState title="Та одоогоор кино үзээгүй байна" />;
   return (
     <div className="space-y-8">
-      {unfinished.length > 0 && (
+      {unfinished.data.total > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-bold">Үргэлжлүүлэн үзэх</h2>
-          <div className={GRID}>{unfinished.map((i) => <ContinueCard key={i.movie.id} item={i} />)}</div>
+          <div className={GRID}>{unfinished.data.items.map((i) => <ContinueCard key={i.movie.id} item={i} />)}</div>
+          <Pagination paging={unfinished.data} pager={unfinishedPager} />
         </section>
       )}
-      {finished.length > 0 && (
+      {finished.data.total > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-bold">Үзэж дууссан</h2>
-          <div className={GRID}>{finished.map((i) => <MovieCard key={i.movie.id} movie={i.movie} />)}</div>
+          <div className={GRID}>{finished.data.items.map((i) => <MovieCard key={i.movie.id} movie={i.movie} />)}</div>
+          <Pagination paging={finished.data} pager={finishedPager} />
         </section>
       )}
     </div>

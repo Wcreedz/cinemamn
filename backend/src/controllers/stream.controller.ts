@@ -1,13 +1,14 @@
 import type { Request, Response } from 'express';
 import path from 'path';
 import { Types } from 'mongoose';
+import { z } from 'zod';
 import { env } from '../config/env';
 import { Movie, WatchHistory } from '../models';
 import { StreamService } from '../services/stream.service';
 import { VideoConfigurationService } from '../services/videoConfiguration.service';
 import { safeEqual } from '../utils/crypto';
 import { AppError, forbidden, notFound } from '../utils/errors';
-import { clientIp, objectId, parse } from '../utils/http';
+import { clientIp, objectId, paged, pageQuery, parse } from '../utils/http';
 import { watchProgressSchema } from '../validators';
 import { movieSummary } from './movie.controller';
 
@@ -46,13 +47,18 @@ export async function deliver(req: Request, res: Response) {
 }
 
 export async function watchHistory(req: Request, res: Response) {
-  const rows = await WatchHistory.find({ userId: req.user!._id }).sort({ lastWatchedAt: -1 }).limit(60)
-    .populate({ path: 'movieId', select: '+hlsPath', populate: { path: 'genres' } }).lean();
-  res.json({
-    items: rows.filter((r: any) => r.movieId?.isPublished).map((r: any) => ({
-      movie: movieSummary(r.movieId), progressSeconds: r.progressSeconds, durationSeconds: r.durationSeconds, completed: r.completed, lastWatchedAt: r.lastWatchedAt,
-    })),
-  });
+  const q = parse(pageQuery.extend({ completed: z.enum(['true', 'false']).optional() }), req.query);
+  // Нийтлэгдээгүй киног хариу дээр биш хайлтад хасна: эс бөгөөс нийт тоо, хуудасны хэмжээ буруу болно.
+  const published = await Movie.find({ isPublished: true }).distinct('_id');
+  const filter = { userId: req.user!._id, movieId: { $in: published }, ...(q.completed ? { completed: q.completed === 'true' } : {}) };
+  const [rows, total] = await Promise.all([
+    WatchHistory.find(filter).sort({ lastWatchedAt: -1 }).skip((q.page - 1) * q.limit).limit(q.limit)
+      .populate({ path: 'movieId', select: '+hlsPath', populate: { path: 'genres' } }).lean(),
+    WatchHistory.countDocuments(filter),
+  ]);
+  res.json(paged(rows.map((r: any) => ({
+    movie: movieSummary(r.movieId), progressSeconds: r.progressSeconds, durationSeconds: r.durationSeconds, completed: r.completed, lastWatchedAt: r.lastWatchedAt,
+  })), total, q.page, q.limit));
 }
 
 export async function saveProgress(req: Request, res: Response) {

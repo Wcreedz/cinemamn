@@ -25,7 +25,7 @@ export function PasswordInput({ className, ...props }: Omit<React.InputHTMLAttri
 
 export const PIN_LENGTH = 4;
 
-// Админ хэрэглэгчийн нууц үг шинэчлэх нягт талбар. Хэрэглэгч өөрөө оруулах хуудсууд PinPad-ыг ашиглана.
+// Админ хэрэглэгчийн нууц үг шинэчлэх нягт талбар. Хэрэглэгч өөрөө оруулах хуудсууд PinField-ийг ашиглана.
 export function PinInput({ onValue, ...props }: Omit<React.ComponentProps<typeof PasswordInput>, 'onChange' | 'value' | 'maxLength' | 'pattern' | 'inputMode'> & { value: string; onValue: (value: string) => void }) {
   return (
     <PasswordInput

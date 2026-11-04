@@ -60,7 +60,7 @@ export async function categories(_req: Request, res: Response) {
   res.json({ items: items.map(categoryView) });
 }
 export async function search(req: Request, res: Response) {
-  const { q, page, limit } = parse(z.object({ q: z.string().trim().min(1).max(100), page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(50).default(24) }), req.query);
+  const { q, page, limit } = parse(z.object({ q: z.string().trim().min(1).max(100), page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(24) }), req.query);
   // Text index зөвхөн бүтэн үгээр хайдаг тул үр дүнгүй бол гарчгийн хэсэгчилсэн хайлт руу шилжинэ.
   let filter: Record<string, unknown> = { isPublished: true, $text: { $search: q } };
   let total = await Movie.countDocuments(filter);

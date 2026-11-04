@@ -11,6 +11,7 @@ import { Confirm } from '@/components/ui/confirm';
 import { Input } from '@/components/ui/input';
 import { Badge, Banner, EmptyState, ErrorState, Notice, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
+import { usePagination } from '@/hooks/use-pagination';
 import { api } from '@/lib/api';
 
 const POLL_MS = 5000;
@@ -39,8 +40,9 @@ function SavedNotice() {
 
 export default function AdminMovies() {
   const [q, setQ] = useState('');
-  const [page, setPage] = useState(1);
-  const { data, error, loading, reload } = useApi<Paginated<AdminMovie>>(`/api/admin/movies?page=${page}&q=${encodeURIComponent(q)}`);
+  const pager = usePagination();
+  const { page, setPage } = pager;
+  const { data, error, loading, reload } = useApi<Paginated<AdminMovie>>(`/api/admin/movies?${pager.query}&q=${encodeURIComponent(q)}`);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -74,7 +76,7 @@ export default function AdminMovies() {
       {error && data && <Notice tone="warning" className="mb-4">Төлөв шинэчлэгдэхгүй байна. Автоматаар дахин оролдож байна. Байршуулалт, боловсруулалт үргэлжилж байгаа.</Notice>}
       {error && !data ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : !data?.items.length ? <EmptyState title="Кино алга байна" /> : (
         <>
-          <Table head={['Гарчиг', 'Төлөв', 'Видео', 'Үзсэн', '']} paging={data} onPage={setPage}>
+          <Table head={['Гарчиг', 'Төлөв', 'Видео', 'Үзсэн', '']} paging={data} pager={pager}>
             {data.items.map((m) => (
               <tr key={m.id}>
                 <td className="px-4 py-3"><Link href={`/admin/movies/${m.id}`} className="font-semibold text-primary hover:underline">{m.title}</Link>{m.featured && <Badge tone="primary" className="ml-2">Онцлох</Badge>}</td>

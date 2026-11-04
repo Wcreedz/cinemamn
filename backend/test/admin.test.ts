@@ -232,6 +232,8 @@ describe('Админ удирдлага', () => {
     expect((await api().get(`/api/search?q=${encodeURIComponent('Хайлтын')}`)).body.total).toBe(1);
     expect((await api().get(`/api/search?q=${encodeURIComponent('Хайл')}`)).body.total).toBe(1);
     expect((await api().get('/api/search?q=' + encodeURIComponent('(.*)'))).body.total).toBe(0);
+    // Хуудасны бүх хэмжээг (10, 20, 50, 100) зөвшөөрнө.
+    expect((await api().get(`/api/search?q=${encodeURIComponent('Хайл')}&limit=100`)).status).toBe(200);
     expect(await Category.countDocuments()).toBe(1);
   });
 });

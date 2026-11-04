@@ -11,7 +11,7 @@ import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { authHref, safeNext } from '@/lib/auth-entry';
 import { PasswordInput } from '@/components/ui/password-input';
-import { PinPad } from '@/components/ui/pin-pad';
+import { PinField } from '@/components/ui/pin-field';
 import { RememberMe } from '@/components/ui/remember-me';
 import { useRememberedLogin } from '@/hooks/use-remembered-login';
 
@@ -44,7 +44,7 @@ function LoginForm() {
       <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required pattern="[+0-9 ()\-]+" title="Утасны дугаараа оруулна уу" placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
       {legacy
         ? <div><Label htmlFor="password">Нууц үг</Label><PasswordInput id="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-        : <PinPad id="password" label="Нууц үг" autoComplete="current-password" disabled={busy} value={password} onValue={setPassword} onComplete={(pin) => { if (phone.trim()) void signIn(pin); }} />}
+        : <PinField id="password" label="Нууц үг" autoComplete="current-password" disabled={busy} value={password} onValue={setPassword} onComplete={(pin) => { if (phone.trim()) void signIn(pin); }} />}
       <button type="button" onClick={switchMode} className="block w-full cursor-pointer text-center text-sm text-muted-foreground hover:underline">{legacy ? '4 оронтой нууц үгээр нэвтрэх' : 'Хуучин нууц үгээр нэвтрэх'}</button>
       <RememberMe checked={remember} onChange={setRemember} />
       {error && <Notice tone="danger">{error}</Notice>}

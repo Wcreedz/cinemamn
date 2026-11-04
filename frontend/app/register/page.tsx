@@ -10,7 +10,7 @@ import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { authHref, safeNext } from '@/lib/auth-entry';
-import { PinPad } from '@/components/ui/pin-pad';
+import { PinField } from '@/components/ui/pin-field';
 
 function RegisterForm() {
   const router = useRouter();
@@ -36,7 +36,7 @@ function RegisterForm() {
     <>
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-        <PinPad id="password" label="4 оронтой нууц үг сонгох" disabled={busy} value={password} onValue={setPassword} />
+        <PinField id="password" label="4 оронтой нууц үг сонгох" disabled={busy} value={password} onValue={setPassword} />
         {error && <Notice tone="danger">{error}</Notice>}
         <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Үүсгэж байна…' : 'Бүртгэл үүсгэх'}</Button>
       </form>

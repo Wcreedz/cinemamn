@@ -7,6 +7,7 @@ import { Input, Select } from '@/components/ui/input';
 import { Badge, EmptyState, ErrorState, Notice, Skeleton } from '@/components/ui/misc';
 import { useApp } from '@/components/providers';
 import { useApi } from '@/hooks/use-api';
+import { usePagination } from '@/hooks/use-pagination';
 import { api } from '@/lib/api';
 import { dateTime, money } from '@/lib/utils';
 
@@ -19,9 +20,10 @@ export default function AdminPayments() {
   const [status, setStatus] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [page, setPage] = useState(1);
+  const pager = usePagination();
+  const { page, limit, setPage } = pager;
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const query = new URLSearchParams({ page: String(page), ...(q ? { q } : {}), ...(status ? { status } : {}), ...(from ? { from } : {}), ...(to ? { to: `${to}T23:59:59` } : {}) });
+  const query = new URLSearchParams({ page: String(page), limit: String(limit), ...(q ? { q } : {}), ...(status ? { status } : {}), ...(from ? { from } : {}), ...(to ? { to: `${to}T23:59:59` } : {}) });
   const { data, error, loading, reload } = useApi<Paginated<Row>>(`/api/admin/payments?${query}`);
 
   const verify = async (p: Row) => {
@@ -53,7 +55,7 @@ export default function AdminPayments() {
       {msg && <Notice tone={msg.ok ? 'success' : 'danger'} className="mb-4">{msg.text}</Notice>}
       {error ? <ErrorState message={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64" /> : !data?.items.length ? <EmptyState title="Төлбөр олдсонгүй" /> : (
         <>
-          <Table head={['Захиалга', 'Утас', 'Дүн', 'Төлөв', 'Огноо', '']} paging={data} onPage={setPage}>
+          <Table head={['Захиалга', 'Утас', 'Дүн', 'Төлөв', 'Огноо', '']} paging={data} pager={pager}>
             {data.items.map((p) => (
               <tr key={p.id}>
                 <td className="px-4 py-3"><p className="font-mono text-xs">{p.orderNumber}</p><p className="max-w-52 truncate text-xs text-muted-foreground" title={p.invoiceId}>{p.invoiceId}</p></td>

@@ -6,7 +6,9 @@ import type { Paginated, PaymentView, PlansResponse, SubscriptionMe } from '@mon
 import { AuthGate } from '@/components/auth-gate';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, EmptyState, ErrorState, Notice, Skeleton } from '@/components/ui/misc';
+import { Pagination } from '@/components/ui/pagination';
 import { useApi } from '@/hooks/use-api';
+import { usePagination } from '@/hooks/use-pagination';
 import { api } from '@/lib/api';
 import { date, money } from '@/lib/utils';
 
@@ -19,7 +21,8 @@ function Content() {
   const router = useRouter();
   const plans = useApi<PlansResponse>('/api/subscriptions/plans');
   const me = useApi<SubscriptionMe>('/api/subscriptions/me');
-  const history = useApi<Paginated<PaymentView>>('/api/payments/history?limit=10');
+  const pager = usePagination();
+  const history = useApi<Paginated<PaymentView>>(`/api/payments/history?${pager.query}`);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,8 +70,8 @@ function Content() {
       </section>
       <section aria-label="Төлбөрийн түүх">
         <h2 className="mb-3 text-lg font-bold">Төлбөрийн түүх</h2>
-        {history.loading ? <Skeleton className="h-24" /> : !history.data?.items.length ? <EmptyState title="Төлбөрийн түүх хоосон байна" /> : (
-          <Card className="divide-y">
+        {history.loading && !history.data ? <Skeleton className="h-24" /> : !history.data?.items.length ? <EmptyState title="Төлбөрийн түүх хоосон байна" /> : (
+          <><Card className="divide-y">
             {history.data.items.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                 <div><p className="font-semibold">{p.planName} · {money(p.amount, p.currency)}</p><p className="text-xs text-muted-foreground">{date(p.createdAt)} · {p.orderNumber}</p></div>
@@ -76,6 +79,7 @@ function Content() {
               </div>
             ))}
           </Card>
+          <Pagination paging={history.data} pager={pager} /></>
         )}
       </section>
     </div>
