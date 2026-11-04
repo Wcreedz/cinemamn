@@ -122,7 +122,7 @@ export const Subscription = model<ISubscription>('Subscription', subscriptionSch
 // ---------- Payment ----------
 export interface IPayment {
   _id: Types.ObjectId; userId: Types.ObjectId; orderNumber: string; invoiceId?: string; paymentId?: string;
-  provider: 'qpay'; amount: number; currency: string; planCode: string; planName: string; durationDays: number;
+  provider: 'qpay'; amount: number; fee?: number; currency: string; planCode: string; planName: string; durationDays: number;
   pricingVersion: number; qpayBaiguullagiinId: string; qpayBarilgiinId: string;
   status: 'pending' | 'paid' | 'failed' | 'expired' | 'refunded'; failureReason?: string;
   subscriptionId?: Types.ObjectId; paidAt?: Date; verifiedAt?: Date; expiresAt?: Date; lastCheckAt?: Date;
@@ -137,7 +137,9 @@ const paymentSchema = new Schema<IPayment>({
   paymentId: String,
   provider: { type: String, enum: ['qpay'], default: 'qpay', immutable: true },
   // Үнэ/тохиргоо өөрчлөгдсөн ч үүссэн нэхэмжлэхийн нөхцөл хэзээ ч өөрчлөгдөхгүй.
+  // amount нь QPay-ээр төлөх нийт дүн (шимтгэл орсон). Шимтгэл нэмэгдэхээс өмнөх төлбөрт fee байхгүй.
   amount: { type: Number, required: true, min: 1, immutable: true },
+  fee: { type: Number, min: 0, immutable: true },
   currency: { type: String, required: true, immutable: true },
   planCode: { type: String, required: true, immutable: true },
   planName: { type: String, required: true, immutable: true },

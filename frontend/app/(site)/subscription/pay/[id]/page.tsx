@@ -71,7 +71,7 @@ function Pay() {
   }
   return (
     <div className="mx-auto max-w-md space-y-4">
-      {p.qr && <QPayOptions qr={p.qr} amount={money(p.amount, p.currency)} />}
+      {p.qr && <QPayOptions qr={p.qr} amount={money(p.amount, p.currency)} feeNote={p.fee ? `QPay шимтгэл ${money(p.fee, p.currency)} орсон` : undefined} />}
       {note && <Notice tone="warning">{note}</Notice>}
       <Button className="w-full" disabled={checking} onClick={() => void check()}>{checking ? 'Шалгаж байна…' : 'Төлбөр шалгах'}</Button>
       {process.env.NODE_ENV !== 'production' && (

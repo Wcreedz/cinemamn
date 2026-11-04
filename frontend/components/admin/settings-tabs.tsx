@@ -103,6 +103,7 @@ export function SubscriptionTab({ entry, reload }: { entry: Entry<Subscription>;
             <Button variant="ghost" size="icon" aria-label="Устгах" disabled={f.plans.length <= 1} onClick={() => setForm({ ...f, plans: f.plans.filter((_, j) => j !== i) })}><Trash2 /></Button>
           </div>
         ))}
+        <p className="text-xs text-muted-foreground">Энд оруулсан үнэ дээр QPay-ийн 1% шимтгэл нэмэгдэж хэрэглэгч төлнө. Жишээ: 10,000₮ бол 10,100₮.</p>
         <Button variant="outline" onClick={() => setForm({ ...f, plans: [...f.plans, { code: '', name: '', price: 0, durationDays: 30, enabled: false }] })}><Plus />Багц нэмэх</Button>
         <SaveRow msg={msg} busy={busy} save={() => void save()} />
       </Panel>

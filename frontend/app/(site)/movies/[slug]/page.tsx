@@ -54,7 +54,7 @@ export default function MovieDetailPage() {
           {!comingSoon && !canWatch && (
             <Card className="mt-5 max-w-lg p-4">
               <p className="font-semibold">Энэ киног үзэхийн тулд идэвхтэй эрх шаардлагатай.</p>
-              {plan && <p className="mt-1 text-sm text-muted-foreground">{plan.name}: {money(plan.price, plan.currency)} / {plan.durationDays} хоног. Бүх кино багтана.</p>}
+              {plan && <p className="mt-1 text-sm text-muted-foreground">{plan.name}: {money(plan.total, plan.currency)} / {plan.durationDays} хоног. Бүх кино багтана.</p>}
             </Card>
           )}
           {m.description && <p className="mt-6 max-w-3xl whitespace-pre-line leading-relaxed text-gray-300">{m.description}</p>}

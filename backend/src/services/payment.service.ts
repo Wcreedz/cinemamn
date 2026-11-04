@@ -46,7 +46,7 @@ export const PaymentService = {
     if (existing) return existing;
 
     const payment = await Payment.create({
-      userId, orderNumber: newOrderNumber(), amount: quote.amount, currency: quote.currency,
+      userId, orderNumber: newOrderNumber(), amount: quote.amount, fee: quote.fee, currency: quote.currency,
       planCode: quote.planCode, planName: quote.planName, durationDays: quote.durationDays, pricingVersion: quote.pricingVersion,
       qpayBaiguullagiinId: ref.baiguullagiinId, qpayBarilgiinId: ref.barilgiinId, status: 'pending',
       expiresAt: new Date(now.getTime() + quote.expiryMinutes * 60_000),
@@ -176,7 +176,7 @@ export const PaymentService = {
   view(p: IPayment) {
     const open = p.status === 'pending';
     return {
-      id: String(p._id), orderNumber: p.orderNumber, planCode: p.planCode, planName: p.planName, amount: p.amount, currency: p.currency,
+      id: String(p._id), orderNumber: p.orderNumber, planCode: p.planCode, planName: p.planName, amount: p.amount, fee: p.fee, currency: p.currency,
       status: p.status, failureReason: p.failureReason, paidAt: p.paidAt, createdAt: p.createdAt, expiresAt: p.expiresAt,
       ...(open && p.qr ? { qr: { image: p.qr.image, text: p.qr.text, shortUrl: p.qr.shortUrl, urls: p.qr.urls ?? [] } } : {}),
     };

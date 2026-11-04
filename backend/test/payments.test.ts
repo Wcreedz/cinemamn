@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import { env } from '../src/config/env';
 import { Payment, Subscription } from '../src/models';
+import { qpayFee } from '../src/services/subscriptionPricing.service';
 import { BAIGUULLAGIIN_ID, BARILGIIN_ID, parseCheckResponse } from '../src/services/qpay.gateway';
 import { PaymentService } from '../src/services/payment.service';
 import { SubscriptionService } from '../src/services/subscription.service';
@@ -25,14 +26,43 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   afterAll(async () => { await qpay.stop(); await stopDb(); });
   beforeEach(async () => { await resetDb(); qpay.reset(); });
 
+  it('QPay-ийн 1% шимтгэлийг нэмж нэхэмжилж, нийт дүнгээр төлөгдвөл эрх идэвхжинэ', async () => {
+    expect([10000, 14900, 3000, 80, 1].map(qpayFee)).toEqual([100, 149, 30, 1, 1]);
+    await setup();
+    const admin = await login('admin');
+    const { body } = await admin.agent.get('/api/admin/settings');
+    await admin.agent.put('/api/admin/settings/subscription').send({ value: { ...body.subscription.value, plans: [{ code: 'MONTHLY', name: 'Сарын эрх', price: 10000, durationDays: 30, enabled: true }] } });
+
+    expect((await api().get('/api/subscriptions/plans')).body.plans[0]).toMatchObject({ price: 10000, fee: 100, total: 10100 });
+    const buyer = await login();
+    const res = await buyer.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY', amount: 1 });
+    expect(res.body).toMatchObject({ amount: 10100, fee: 100 });
+    const doc = (await Payment.findById(res.body.id).lean())!;
+    expect(qpay.invoices.get(doc.invoiceId!)!.amount).toBe(10100);
+
+    // Шимтгэлгүй үнээр төлсөн бол эрх идэвхжихгүй.
+    const other = await login();
+    const short = (await other.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' })).body;
+    const shortDoc = (await Payment.findById(short.id).lean())!;
+    qpay.markPaid(shortDoc.invoiceId!, 10000);
+    expect((await callback(shortDoc.orderNumber)).body.outcome).toBe('rejected');
+    expect((await Payment.findById(short.id).lean())!.failureReason).toBe('AMOUNT_MISMATCH');
+    expect(await Subscription.countDocuments({ paymentId: shortDoc._id })).toBe(0);
+
+    qpay.markPaid(doc.invoiceId!);
+    expect((await callback(doc.orderNumber)).body.outcome).toBe('paid');
+    expect((await Subscription.findOne({ paymentId: doc._id }).lean())!.amount).toBe(10100);
+  });
+
   it('багцын харилцагчийн бүтцээр нэхэмжлэх үүсгэж QR буцаана', async () => {
     await setup();
     const { res, doc } = await newPayment();
-    expect(res.body.amount).toBe(14900);
+    expect(res.body.amount).toBe(15049);
+    expect(res.body.fee).toBe(149);
     expect(res.body.qr.image).toBe('QRIMG');
     expect(res.body.qr.urls[0].link).toBe('khanbank://q');
     const inv = qpay.invoices.get(doc.invoiceId!)!;
-    expect(inv.amount).toBe(14900);
+    expect(inv.amount).toBe(15049);
     expect(inv.merchantId).toBe('merchant-false');
     expect(inv.callback).toBe(`http://localhost:4100/api/qpaycallback/${BAIGUULLAGIIN_ID}/${doc.orderNumber}`);
     expect(doc.qpayBarilgiinId).toBe(BARILGIIN_ID);
@@ -42,7 +72,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     await setup();
     const user = await login();
     const res = await user.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY', amount: 1, currency: 'USD', status: 'paid' });
-    expect(res.body.amount).toBe(14900);
+    expect(res.body.amount).toBe(15049);
     expect(res.body.currency).toBe('MNT');
     expect(res.body.status).toBe('pending');
   });
@@ -143,7 +173,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   it('буруу валют эрх үүсгэхгүй', async () => {
     await setup();
     const { doc } = await newPayment();
-    qpay.markPaid(doc.invoiceId!, 14900, 'USD');
+    qpay.markPaid(doc.invoiceId!, 15049, 'USD');
     expect((await callback(doc.orderNumber)).body.outcome).toBe('rejected');
     expect(await Subscription.countDocuments()).toBe(0);
   });
@@ -253,7 +283,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     const { doc } = await newPayment();
     await Payment.updateOne({ _id: doc._id }, { $set: { amount: 1, qpayBaiguullagiinId: 'other' } });
     const after = (await Payment.findById(doc._id).lean())!;
-    expect(after.amount).toBe(14900);
+    expect(after.amount).toBe(15049);
     expect(after.qpayBaiguullagiinId).toBe(BAIGUULLAGIIN_ID);
   });
 

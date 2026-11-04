@@ -20,7 +20,7 @@ describe('Админ тохиргоо', () => {
     expect((await api().get('/api/subscriptions/plans')).body.plans[0].price).toBe(14900);
     const buyer = await login();
     const oldInv = await buyer.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
-    expect(oldInv.body.amount).toBe(14900);
+    expect(oldInv.body.amount).toBe(15049);
     const oldDoc = (await Payment.findById(oldInv.body.id).lean())!;
 
     const holder = await login();
@@ -34,12 +34,12 @@ describe('Админ тохиргоо', () => {
     expect((await api().get('/api/subscriptions/plans')).body.plans[0].price).toBe(19900);
     // Шинэ нэхэмжлэх
     const newInv = await buyer.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY' });
-    expect(newInv.body.amount).toBe(19900);
+    expect(newInv.body.amount).toBe(20099);
     expect(newInv.body.id).not.toBe(oldInv.body.id);
-    expect(qpay.invoices.get((await Payment.findById(newInv.body.id).lean())!.invoiceId!)!.amount).toBe(19900);
-    // Хуучин нэхэмжлэх 14,900 хэвээр, 14,900-аар төлөгдвөл амжилттай
+    expect(qpay.invoices.get((await Payment.findById(newInv.body.id).lean())!.invoiceId!)!.amount).toBe(20099);
+    // Хуучин нэхэмжлэх 15,049 (14,900 + 1%) хэвээр, тэр дүнгээр төлөгдвөл амжилттай
     const reread = (await Payment.findById(oldInv.body.id).lean())!;
-    expect(reread.amount).toBe(14900);
+    expect(reread.amount).toBe(15049);
     expect(reread.pricingVersion).toBe(oldDoc.pricingVersion);
     qpay.markPaid(reread.invoiceId!);
     expect((await api().get(`/api/qpaycallback/${BAIGUULLAGIIN_ID}/${reread.orderNumber}`)).body.outcome).toBe('paid');

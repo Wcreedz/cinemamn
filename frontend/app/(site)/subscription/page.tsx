@@ -56,7 +56,8 @@ function Content() {
             {plans.data?.plans.map((p) => (
               <Card key={p.code} className="flex flex-col p-5">
                 <p className="font-bold">{p.name}</p>
-                <p className="mt-2 text-3xl font-black text-primary">{money(p.price, p.currency)}</p>
+                <p className="mt-2 text-3xl font-black text-primary">{money(p.total, p.currency)}</p>
+                <p className="text-xs text-muted-foreground">{money(p.price, p.currency)} + QPay шимтгэл {money(p.fee, p.currency)}</p>
                 <p className="text-sm text-muted-foreground">{p.durationDays} хоног</p>
                 <ul className="my-4 space-y-1 text-sm">
                   <li className="flex items-center gap-2"><Check className="size-4 text-success" />Бүх кино үзэх</li>
