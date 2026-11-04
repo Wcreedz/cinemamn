@@ -26,15 +26,18 @@ function Catalog() {
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-black">Кино</h1>
         {banner && <CatalogBanner banner={banner} />}
-        <Select aria-label="Ангилал" className="w-auto" value={category} onChange={(e) => { setPage(1); router.push(e.target.value ? `/?category=${e.target.value}` : '/'); }}>
-          <option value="">Бүх ангилал</option>
-          {cats.data?.items.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}
-        </Select>
-        <Select aria-label="Эрэмбэ" className="w-auto" value={sort} onChange={(e) => { setPage(1); setSort(e.target.value); }}>
-          <option value="new">Шинэ нь эхэндээ</option>
-          <option value="popular">Түгээмэл</option>
-          <option value="title">Нэрээр</option>
-        </Select>
+        {/* Өргөнийг сонголтын текстээс бус байрлалаас тогтооно: утсанд тэнцүү хоёр багана, том дэлгэцэд тогтмол өргөн. */}
+        <div className="flex w-full gap-3 sm:w-auto">
+          <Select aria-label="Ангилал" className="flex-1 sm:w-48 sm:flex-none" value={category} onChange={(e) => { setPage(1); router.push(e.target.value ? `/?category=${e.target.value}` : '/'); }}>
+            <option value="">Бүх ангилал</option>
+            {cats.data?.items.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}
+          </Select>
+          <Select aria-label="Эрэмбэ" className="flex-1 sm:w-48 sm:flex-none" value={sort} onChange={(e) => { setPage(1); setSort(e.target.value); }}>
+            <option value="new">Шинэ нь эхэндээ</option>
+            <option value="popular">Түгээмэл</option>
+            <option value="title">Нэрээр</option>
+          </Select>
+        </div>
       </div>
       {error ? <ErrorState message={error} onRetry={reload} /> : loading ? <MovieGridSkeleton /> : !data?.items.length ? <EmptyState title="Кино олдсонгүй" /> : (
         <>
