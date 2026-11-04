@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { env } from '../src/config/env';
 import { Category, Movie, SystemSetting } from '../src/models';
-import { defaults } from '../src/services/settings.service';
+import { defaults, SettingsService } from '../src/services/settings.service';
 import { api, login, makeMovie, resetDb, startDb, stopDb } from './helpers';
 
 const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(16)]);
@@ -12,7 +12,7 @@ const onDisk = (url: string) => path.join(env.VIDEO_DEFAULT_ROOT, url.replace('/
 const exists = (url: string) => fs.access(onDisk(url)).then(() => true, () => false);
 const fields = (m: { title: string }, over: Record<string, unknown> = {}) => ({ title: m.title, isPublished: true, ...over });
 
-describe('Зураг: солих, устгах, ангилал, нүүр хуудас', () => {
+describe('Зураг: солих, устгах, ангилал', () => {
   beforeAll(startDb);
   afterAll(async () => { await fs.rm(env.VIDEO_DEFAULT_ROOT, { recursive: true, force: true }); await stopDb(); });
   beforeEach(resetDb);
@@ -129,52 +129,6 @@ describe('Зураг: солих, устгах, ангилал, нүүр хуу�
     expect((await api().post('/api/admin/banners/image').attach('image', png, attachment)).status).toBe(401);
   });
 
-  it('слайд, зар: зөвхөн идэвхтэй нь нийтэд гарна, хасагдсан файл устана', async () => {
-    const { agent } = await login('admin');
-    const upload = async () => (await agent.post('/api/admin/banners/image').attach('image', png, attachment)).body.url as string;
-    const [slide, hidden, ad] = [await upload(), await upload(), await upload()];
-    expect(slide).toMatch(/^\/media\/backdrops\/banners\/.+\.png$/);
-    const value = {
-      ...defaults().homepage,
-      heroBanners: [{ title: '', image: slide, link: '/movies/kino', enabled: true }, { title: 'Нуугдсан', image: hidden, enabled: false }],
-      adBanners: [{ image: ad, link: 'https://example.com/zar', enabled: true }],
-    };
-    expect((await agent.put('/api/admin/settings/homepage').send({ value })).status).toBe(200);
-    const pub = (await api().get('/api/settings/public')).body.homepage;
-    expect(pub.heroBanners.map((b: { image: string }) => b.image)).toEqual([slide]);
-    expect(pub.adBanners.map((b: { image: string }) => b.image)).toEqual([ad]);
-
-    const next = { ...value, heroBanners: [value.heroBanners[0]], adBanners: [] };
-    expect((await agent.put('/api/admin/settings/homepage').send({ value: next })).status).toBe(200);
-    expect(await exists(slide)).toBe(true);
-    expect(await exists(hidden)).toBe(false);
-    expect(await exists(ad)).toBe(false);
-  });
-
-  it('жагсаалтын баннер: идэвхтэй үед л нийтэд гарч, солигдсон зураг устана', async () => {
-    const { agent } = await login('admin');
-    const upload = async () => (await agent.post('/api/admin/banners/image').attach('image', png, attachment)).body.url as string;
-    const [image, mobileImage, replacement] = [await upload(), await upload(), await upload()];
-    const put = (catalogBanner: Record<string, unknown>) => agent.put('/api/admin/settings/homepage').send({ value: { ...defaults().homepage, catalogBanner } });
-    const shown = async () => (await api().get('/api/settings/public')).body.homepage.catalogBanner;
-
-    expect(await shown()).toBeNull();
-    expect((await put({ image, mobileImage, link: '/movies/kino', enabled: false })).status).toBe(200);
-    expect(await shown()).toBeNull();
-    expect((await put({ image, mobileImage, link: '/movies/kino', enabled: true })).status).toBe(200);
-    expect(await shown()).toEqual({ image, mobileImage, link: '/movies/kino' });
-
-    expect((await put({ image: replacement, enabled: true })).status).toBe(200);
-    expect(await shown()).toEqual({ image: replacement });
-    expect(await exists(image)).toBe(false);
-    expect(await exists(mobileImage)).toBe(false);
-    expect(await exists(replacement)).toBe(true);
-
-    expect((await put({ image: '', enabled: true })).status).toBe(400);
-    expect((await put({ image: 'javascript:alert(1)', enabled: true })).status).toBe(400);
-    expect((await put({ image: replacement, link: 'javascript:alert(1)', enabled: true })).status).toBe(400);
-  });
-
   it('лого, favicon: солигдсон зураг устаж, идэвхтэй нь нийтэд гарна', async () => {
     const { agent } = await login('admin');
     const upload = async () => (await agent.post('/api/admin/banners/image').attach('image', png, attachment)).body.url as string;
@@ -195,31 +149,48 @@ describe('Зураг: солих, устгах, ангилал, нүүр хуу�
     expect((await put({ favicon: 'javascript:alert(1)' })).status).toBe(400);
   });
 
-  it('жагсаалтын баннер нэмэгдэхээс өмнө хадгалсан тохиргоо эвдрэхгүй', async () => {
-    const { catalogBanner: _dropped, ...old } = defaults().homepage;
-    expect(_dropped.enabled).toBe(false);
-    await SystemSetting.create({ key: 'homepage', value: old, version: 3 });
-    const { body, status } = await api().get('/api/settings/public');
-    expect(status).toBe(200);
-    expect(body.homepage.catalogBanner).toBeNull();
+  it('баннер: нийтэд гарч, солигдсон зураг устана', async () => {
+    const { agent } = await login('admin');
+    const upload = async () => (await agent.post('/api/admin/banners/image').attach('image', png, attachment)).body.url as string;
+    const [first, second] = [await upload(), await upload()];
+    const put = (banner: string) => agent.put('/api/admin/settings/general').send({ value: { ...defaults().general, banner } });
+    const shown = async () => (await api().get('/api/settings/public')).body.general.banner;
+
+    expect(await shown()).toBe('');
+    expect((await put(first)).status).toBe(200);
+    expect(await shown()).toBe(first);
+    expect((await put(second)).status).toBe(200);
+    expect(await shown()).toBe(second);
+    expect(await exists(first)).toBe(false);
+    expect((await put('')).status).toBe(200);
+    expect(await shown()).toBe('');
+    expect(await exists(second)).toBe(false);
+    expect((await put('javascript:alert(1)')).status).toBe(400);
   });
 
-  it('слайд, зарын буруу утгыг татгалзана', async () => {
+  it('хуучин зарын баннерт оруулсан зураг шууд харагдаж, устгасны дараа буцаж гарахгүй', async () => {
     const { agent } = await login('admin');
-    const put = (over: Record<string, unknown>) => agent.put('/api/admin/settings/homepage').send({ value: { ...defaults().homepage, ...over } });
-    expect((await put({ heroBanners: [{ title: '', enabled: true }] })).status).toBe(400);
-    expect((await put({ heroBanners: [{ title: 'А', link: 'javascript:alert(1)', enabled: true }] })).status).toBe(400);
-    expect((await put({ adBanners: [{ enabled: true }] })).status).toBe(400);
-    expect((await put({ adBanners: [{ image: 'javascript:alert(1)', enabled: true }] })).status).toBe(400);
+    const old = (await agent.post('/api/admin/banners/image').attach('image', png, attachment)).body.url as string;
+    const { banner: _notSavedYet, ...savedBefore } = defaults().general;
+    await SystemSetting.collection.insertOne({ key: 'general', value: savedBefore, version: 1 });
+    await SystemSetting.collection.insertOne({ key: 'homepage', value: { catalogBanner: { image: '', enabled: false }, adBanners: [{ image: '/media/off.png', enabled: false }, { image: old, enabled: true }] }, version: 1 });
+    SettingsService.invalidate();
+    const shown = async () => (await api().get('/api/settings/public')).body.general.banner;
+
+    expect(await shown()).toBe(old);
+    const { body } = await agent.get('/api/admin/settings');
+    expect(body.general.value.banner).toBe(old);
+    expect((await agent.put('/api/admin/settings/general').send({ value: { ...body.general.value, banner: '' }, expectedVersion: body.general.version })).status).toBe(200);
+    expect(await shown()).toBe('');
+    expect(await exists(old)).toBe(false);
   });
 
-  it('зарын талбар нэмэгдэхээс өмнө хадгалсан тохиргоо эвдрэхгүй', async () => {
-    const { adBanners: _dropped, ...old } = defaults().homepage;
-    await SystemSetting.create({ key: 'homepage', value: old, version: 3 });
-    const { body, status } = await api().get('/api/settings/public');
-    expect(status).toBe(200);
-    expect(body.homepage.adBanners).toEqual([]);
+  it('нүүр хуудасны хуучин тохиргоо нийтэд гарахгүй, хаягаар нь засагдахгүй', async () => {
     const { agent } = await login('admin');
-    expect((await agent.get('/api/admin/settings')).body.homepage.value.adBanners).toEqual([]);
+    await SystemSetting.collection.insertOne({ key: 'homepage', value: { adBanners: [{ image: '/media/a.png', enabled: true }] }, version: 1 });
+    expect((await api().get('/api/settings/public')).body.homepage).toBeUndefined();
+    expect((await agent.get('/api/admin/settings')).body.homepage).toBeUndefined();
+    expect((await agent.put('/api/admin/settings/homepage').send({ value: {} })).status).toBe(404);
+    expect((await agent.put('/api/admin/settings').send({ section: 'homepage', value: {} })).status).toBe(400);
   });
 });

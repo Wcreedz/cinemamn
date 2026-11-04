@@ -2,7 +2,7 @@
 import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PublicSettings, PublicUser, SubscriptionMe } from '@mongolflix/shared';
-import { api, isAdminPath, refreshSession, setSiteActsAsAdmin } from '@/lib/api';
+import { api, isAdminPath, refreshSession, setSessionLostHandler, setSiteActsAsAdmin } from '@/lib/api';
 import { reportVisit } from '@/lib/visit';
 
 interface AppState {
@@ -64,6 +64,14 @@ export function Providers({ children }: { children: ReactNode }) {
   }, [area]);
 
   useEffect(() => { void refreshUser(); }, [refreshUser]);
+  // Зөвхөн нэвтэрсэн дэлгэцэд: зочны 401 хариу сессийг дахин шалгуулах шаардлагагүй.
+  // Сесс дууссан бол user null болж, админ layout нэвтрэх хуудас руу шилжүүлнэ.
+  const signedIn = !!user;
+  useEffect(() => {
+    if (!signedIn) return;
+    setSessionLostHandler(() => void refreshUser());
+    return () => setSessionLostHandler(null);
+  }, [signedIn, refreshUser]);
   useEffect(() => { api<PublicSettings>('/api/settings/public').then(setSettings).catch(() => setSettings(null)); }, []);
 
   useEffect(() => {

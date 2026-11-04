@@ -79,7 +79,7 @@ export default function AdminMovies() {
           <Table head={['Гарчиг', 'Төлөв', 'Видео', 'Үзсэн', '']} paging={data} pager={pager}>
             {data.items.map((m) => (
               <tr key={m.id}>
-                <td className="px-4 py-3"><Link href={`/admin/movies/${m.id}`} className="font-semibold text-primary hover:underline">{m.title}</Link>{m.featured && <Badge tone="primary" className="ml-2">Онцлох</Badge>}</td>
+                <td className="px-4 py-3"><Link href={`/admin/movies/${m.id}`} className="font-semibold text-primary hover:underline">{m.title}</Link></td>
                 <td className="px-4 py-3"><Badge tone={m.isPublished ? 'success' : 'neutral'}>{m.isPublished ? 'Нийтлэгдсэн' : 'Ноорог: сайтад харагдахгүй'}</Badge></td>
                 <td className="px-4 py-3">{m.videoStatus !== 'ready' && <VideoBadge movie={m} />}<VideoTimes movie={m} />{m.videoStatus === 'ready' && m.videoUploadSeconds === undefined && m.videoProcessSeconds === undefined && <span className="text-muted-foreground">—</span>}{m.videoError && <p className="mt-1 max-w-xs text-xs font-medium text-destructive">{videoErrorText(m.videoError)}</p>}</td>
                 <td className="px-4 py-3">{m.viewCount}</td>

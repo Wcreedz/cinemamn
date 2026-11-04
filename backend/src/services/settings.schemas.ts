@@ -6,6 +6,7 @@ export const generalSchema = z.object({
   siteName: z.string().trim().min(1).max(60),
   logo: url.default(''),
   favicon: url.default(''),
+  banner: url.default(''),
   description: z.string().trim().max(300).default(''),
   maintenanceMode: z.boolean(),
 });
@@ -49,50 +50,18 @@ export const securitySchema = z.object({
   allowedAdminIps: z.array(z.union([z.ipv4(), z.ipv6()])).max(100),
 });
 
-export const homepageSchema = z.object({
-  heroBanners: z.array(z.object({
-    title: z.string().trim().max(120).default(''),
-    subtitle: z.string().trim().max(300).optional(),
-    image: url.optional(),
-    link: url.optional(),
-    enabled: z.boolean(),
-  }).refine((b) => b.title || b.image, { path: ['image'], message: 'Слайдад зураг эсвэл гарчиг оруулна уу' })).max(10),
-  adBanners: z.array(z.object({
-    image: url.refine(Boolean, 'Зарын зураг оруулна уу'),
-    link: url.optional(),
-    enabled: z.boolean(),
-  })).max(10).default([]),
-  catalogBanner: z.object({
-    image: url,
-    mobileImage: url.optional(),
-    link: url.optional(),
-    enabled: z.boolean(),
-  }).refine((b) => !b.enabled || b.image, { path: ['image'], message: 'Баннерын зураг оруулна уу' }).default({ image: '', enabled: false }),
-  featuredMovieIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).max(20),
-  sections: z.array(z.object({
-    key: z.string().regex(/^[a-z0-9-]+$/),
-    title: z.string().trim().min(1).max(60),
-    type: z.enum(['new', 'popular', 'continue', 'category']),
-    categorySlug: z.string().optional(),
-    visible: z.boolean(),
-    order: z.number().int(),
-  })).max(30),
-});
-
 export const settingSchemas = {
   general: generalSchema,
   subscription: subscriptionSchema,
   video: videoSchema,
   security: securitySchema,
-  homepage: homepageSchema,
 };
 export type SettingKey = keyof typeof settingSchemas;
 export type GeneralSettings = z.infer<typeof generalSchema>;
 export type SubscriptionSettings = z.infer<typeof subscriptionSchema>;
 export type VideoSettings = z.infer<typeof videoSchema>;
 export type SecuritySettings = z.infer<typeof securitySchema>;
-export type HomepageSettings = z.infer<typeof homepageSchema>;
 export interface SettingValues {
   general: GeneralSettings; subscription: SubscriptionSettings; video: VideoSettings;
-  security: SecuritySettings; homepage: HomepageSettings;
+  security: SecuritySettings;
 }

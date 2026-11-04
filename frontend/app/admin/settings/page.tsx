@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Paginated } from '@mongolflix/shared';
-import { AdminsTab, AllSettings, GeneralTab, HomepageTab, PaymentTab, SecurityTab, SubscriptionTab, VideoTab } from '@/components/admin/settings-tabs';
+import { AdminsTab, AllSettings, GeneralTab, PaymentTab, SecurityTab, SubscriptionTab, VideoTab } from '@/components/admin/settings-tabs';
 import { LogTable, type LogRow } from '@/components/admin/log-table';
 import { PageHeader } from '@/components/admin/ui';
 import { ErrorState, Skeleton } from '@/components/ui/misc';
@@ -11,7 +11,7 @@ import { usePagination } from '@/hooks/use-pagination';
 
 const TABS = [
   ['general', 'Ерөнхий'], ['subscription', 'Эрхийн багц'], ['payment', 'Төлбөр'],
-  ['video', 'Видео'], ['homepage', 'Нүүр хуудас'], ['security', 'Аюулгүй байдал'], ['admins', 'Админ удирдлага'], ['history', 'Өөрчлөлтийн түүх'],
+  ['video', 'Видео'], ['security', 'Аюулгүй байдал'], ['admins', 'Админ удирдлага'], ['history', 'Өөрчлөлтийн түүх'],
 ] as const;
 
 function History() {
@@ -36,7 +36,6 @@ export default function AdminSettingsPage() {
         <TabsContent value="subscription"><SubscriptionTab entry={data.subscription} reload={reload} /></TabsContent>
         <TabsContent value="payment"><PaymentTab entry={data.subscription} reload={reload} /></TabsContent>
         <TabsContent value="video"><VideoTab entry={data.video} roots={data.videoAllowedRoots} reload={reload} /></TabsContent>
-        <TabsContent value="homepage"><HomepageTab entry={data.homepage} reload={reload} /></TabsContent>
         <TabsContent value="security"><SecurityTab entry={data.security} reload={reload} /></TabsContent>
         <TabsContent value="admins"><AdminsTab /></TabsContent>
         <TabsContent value="history"><History /></TabsContent>

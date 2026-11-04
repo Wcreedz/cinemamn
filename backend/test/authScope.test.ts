@@ -63,6 +63,28 @@ describe('Админ, хэрэглэгчийн тусдаа сесс', () => {
     expect((await site()).status).toBe(200);
   });
 
+  it('хэрэглэгч нэвтэрсэн үед админы токен дуусвал админ таб шинэчлэгдэж үргэлжилнэ', async () => {
+    const phone = nextPhone();
+    const email = 'expired@example.com';
+    await User.create({ phone, passwordHash: await hashPassword(PASSWORD) });
+    await User.create({ phone: nextPhone(), email, passwordHash: await hashPassword(PASSWORD), role: 'admin' });
+    const cookie = (res: request.Response, name: string) => ([] as string[]).concat(res.headers['set-cookie']).find((c) => c.startsWith(`${name}=`))!.split(';')[0];
+    const customer = await api().post('/api/auth/login').send({ phone, password: PASSWORD });
+    const admin = await api().post('/api/auth/admin/login').send({ email, password: PASSWORD });
+    // Админы access cookie хугацаа нь дуусаж хөтчөөс алга болсон, refresh болон хэрэглэгчийн сесс хэвээр.
+    const expired = `${cookie(customer, 'mf_access')}; ${cookie(admin, 'mf_admin_refresh')}`;
+
+    const adminTab = await api().get('/api/admin/dashboard').set('Cookie', expired).set('X-Auth-Scope', ADMIN);
+    expect(adminTab.status).toBe(401);
+    // Хэрэглэгчийн таб админы API руу хандвал дахин нэвтрэх биш, эрхгүй.
+    expect((await api().get('/api/admin/dashboard').set('Cookie', expired)).status).toBe(403);
+
+    const renewed = await api().post('/api/auth/refresh').set('Cookie', expired).set('X-Auth-Scope', ADMIN);
+    expect(renewed.status).toBe(200);
+    const again = await api().get('/api/admin/dashboard').set('Cookie', cookie(renewed, 'mf_admin_access')).set('X-Auth-Scope', ADMIN);
+    expect(again.status).toBe(200);
+  });
+
   it('refresh зөвхөн өөрийн сессийг шинэчилж, хариуд нь өөрийн cookie л тавина', async () => {
     const { agent, customer, admin } = await sameBrowser();
     const a = await agent.post('/api/auth/refresh').set('X-Auth-Scope', ADMIN);
@@ -85,7 +107,7 @@ describe('Админ, хэрэглэгчийн тусдаа сесс', () => {
   it('хэрэглэгч толгой хуурамчаар тавьж админ болж чадахгүй', async () => {
     const viewer = await login();
     expect((await viewer.agent.get('/api/auth/me').set('X-Auth-Scope', ADMIN)).status).toBe(401);
-    expect((await viewer.agent.get('/api/admin/dashboard').set('X-Auth-Scope', ADMIN)).status).toBe(403);
+    expect((await viewer.agent.get('/api/admin/dashboard').set('X-Auth-Scope', ADMIN)).status).toBe(401);
     expect((await viewer.agent.post('/api/auth/refresh').set('X-Auth-Scope', ADMIN)).status).toBe(401);
     expect((await viewer.agent.get('/api/auth/me')).status).toBe(200);
   });

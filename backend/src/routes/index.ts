@@ -107,6 +107,5 @@ a.put('/settings/general', settings.updateSection('general'));
 a.put('/settings/subscription', settings.updateSection('subscription'));
 a.put('/settings/video', settings.updateSection('video'));
 a.put('/settings/security', settings.updateSection('security'));
-a.put('/settings/homepage', settings.updateSection('homepage'));
 a.get('/settings/history', settings.history);
 api.use('/admin', a);

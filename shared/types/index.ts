@@ -41,13 +41,8 @@ export interface PaymentView {
   qr?: { image?: string; text?: string; shortUrl?: string; urls: { name: string; description?: string; logo?: string; link: string }[] };
 }
 
-export interface HeroBanner { title: string; subtitle?: string; image?: string; link?: string; enabled: boolean }
-export interface AdBanner { image: string; link?: string; enabled: boolean }
-export interface CatalogBanner { image: string; mobileImage?: string; link?: string }
-export interface HomeSection { key: string; title: string; type: 'new' | 'popular' | 'continue' | 'category'; categorySlug?: string; visible: boolean; order: number }
 export interface PublicSettings {
-  general: { siteName: string; logo?: string; favicon?: string; description: string; maintenanceMode: boolean };
-  homepage: { heroBanners: HeroBanner[]; adBanners: AdBanner[]; catalogBanner?: CatalogBanner | null; featuredMovieIds: string[]; sections: HomeSection[] };
+  general: { siteName: string; logo?: string; favicon?: string; banner?: string; description: string; maintenanceMode: boolean };
   subscription: { enabled: boolean; paymentRequired: boolean; currency: string };
 }
 

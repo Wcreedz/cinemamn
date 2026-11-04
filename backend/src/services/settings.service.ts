@@ -3,14 +3,11 @@ import { env } from '../config/env';
 import { SystemSetting } from '../models';
 import { conflict } from '../utils/errors';
 import { parse } from '../utils/http';
-import { SettingKey, SettingValues, settingSchemas } from './settings.schemas';
+import { GeneralSettings, SettingKey, SettingValues, settingSchemas } from './settings.schemas';
 
 // Анхны утгууд зөвхөн энд байна: админ хадгалмагц баазын утга давуу эрхтэй болно.
-const section = (key: string, title: string, type: 'new' | 'popular' | 'continue' | 'category', order: number, categorySlug?: string) =>
-  ({ key, title, type, order, visible: true, ...(categorySlug ? { categorySlug } : {}) });
-
 export const defaults = (): SettingValues => ({
-  general: { siteName: 'MongolFlix', logo: '', favicon: '', description: 'Монгол хэл дээрх кино үзэх платформ', maintenanceMode: false },
+  general: { siteName: 'MongolFlix', logo: '', favicon: '', banner: '', description: 'Монгол хэл дээрх кино үзэх платформ', maintenanceMode: false },
   subscription: {
     enabled: true, paymentRequired: true, currency: 'MNT', paymentExpiryMinutes: 60,
     plans: [{ code: 'MONTHLY', name: 'Сарын эрх', price: 14900, durationDays: 30, enabled: true }],
@@ -21,24 +18,19 @@ export const defaults = (): SettingValues => ({
     playbackTokenExpiryMinutes: 120,
   },
   security: { sessionExpiryDays: 30, loginMaxAttempts: 5, loginLockMinutes: 15, allowedAdminIps: [] },
-  homepage: {
-    heroBanners: [], adBanners: [], catalogBanner: { image: '', enabled: false }, featuredMovieIds: [],
-    sections: [
-      section('new', 'Шинээр нэмэгдсэн', 'new', 1),
-      section('mongol', 'Монгол кино', 'category', 2, 'mongol'),
-      section('adventure', 'Адал явдалт', 'category', 3, 'adventure'),
-      section('comedy', 'Инээдмийн', 'category', 4, 'comedy'),
-      section('drama', 'Драм', 'category', 5, 'drama'),
-      section('horror', 'Аймшиг', 'category', 6, 'horror'),
-      section('popular', 'Түгээмэл үзэлттэй', 'popular', 7),
-      section('continue', 'Үргэлжлүүлэн үзэх', 'continue', 8),
-    ],
-  },
 });
 
 interface Entry<K extends SettingKey> { value: SettingValues[K]; version: number; at: number }
 const CACHE_TTL_MS = 30_000; // Олон процесс (API/worker) хооронд хоцрох дээд хугацаа.
 const cache = new Map<SettingKey, Entry<SettingKey>>();
+
+// Хуучин "Нүүр хуудас" табд оруулсан зургийг дахин оруулахгүйгээр баннер болгоно. Ерөнхий тохиргоог хадгалмагц banner нь өөрөө хадгалагдаж, энэ уншилт зогсоно.
+async function legacyBanner() {
+  const doc = await SystemSetting.findOne({ key: 'homepage' }).lean();
+  const home = doc?.value as { catalogBanner?: { image?: string; enabled?: boolean }; adBanners?: { image?: string; enabled?: boolean }[] } | undefined;
+  if (home?.catalogBanner?.enabled && home.catalogBanner.image) return home.catalogBanner.image;
+  return home?.adBanners?.find((ad) => ad.enabled && ad.image)?.image ?? '';
+}
 
 export const SettingsService = {
   async getEntry<K extends SettingKey>(key: K, opts: { fresh?: boolean } = {}): Promise<{ value: SettingValues[K]; version: number }> {
@@ -46,7 +38,9 @@ export const SettingsService = {
     if (hit && !opts.fresh && Date.now() - hit.at < CACHE_TTL_MS) return hit;
     const doc = await SystemSetting.findOne({ key }).lean();
     // Хадгалсны дараа нэмэгдсэн талбар хуучин баримтад байхгүй: анхны утгаар нөхнө.
-    const entry: Entry<K> = { value: { ...defaults()[key], ...doc?.value } as SettingValues[K], version: doc?.version ?? 0, at: Date.now() };
+    const value = { ...defaults()[key], ...doc?.value } as SettingValues[K];
+    if (key === 'general' && (doc?.value as { banner?: string } | undefined)?.banner === undefined) (value as GeneralSettings).banner = await legacyBanner();
+    const entry: Entry<K> = { value, version: doc?.version ?? 0, at: Date.now() };
     cache.set(key, entry as unknown as Entry<SettingKey>);
     return entry;
   },
@@ -77,11 +71,10 @@ export const SettingsService = {
   },
 
   async getPublic() {
-    const [general, subscription, homepage] = await Promise.all([this.get('general'), this.get('subscription'), this.get('homepage')]);
+    const [general, subscription] = await Promise.all([this.get('general'), this.get('subscription')]);
     // Энд зөвхөн нийтэд ил байж болох талбаруудыг нэг бүрчлэн сонгоно.
     return {
-      general: { siteName: general.siteName, logo: general.logo, favicon: general.favicon, description: general.description, maintenanceMode: general.maintenanceMode },
-      homepage: { heroBanners: homepage.heroBanners.filter((b) => b.enabled), adBanners: homepage.adBanners.filter((b) => b.enabled), catalogBanner: homepage.catalogBanner.enabled ? { image: homepage.catalogBanner.image, mobileImage: homepage.catalogBanner.mobileImage, link: homepage.catalogBanner.link } : null, featuredMovieIds: homepage.featuredMovieIds, sections: homepage.sections },
+      general: { siteName: general.siteName, logo: general.logo, favicon: general.favicon, banner: general.banner, description: general.description, maintenanceMode: general.maintenanceMode },
       subscription: { enabled: subscription.enabled, paymentRequired: subscription.paymentRequired, currency: subscription.currency },
     };
   },

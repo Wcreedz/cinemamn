@@ -119,7 +119,7 @@ function SaveProgress({ task }: { task: SaveTask }) {
   );
 }
 
-const blank = { title: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true, featured: false };
+const blank = { title: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true };
 
 export const deleteQuestion = (title: string) => `"${title}" киног устгах уу?`;
 export const DELETE_DETAIL = 'Кино файл, зураг, үзсэн түүх устаж, буцаах боломжгүй.';
@@ -128,7 +128,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
   const router = useRouter();
   const cats = useApi<{ items: Category[] }>('/api/admin/categories');
   const [f, setF] = useState(() => movie ? {
-    ...blank, title: movie.title, isPublished: movie.isPublished, featured: movie.featured,
+    ...blank, title: movie.title, isPublished: movie.isPublished,
     poster: movie.poster ?? '', backdrop: movie.backdrop ?? '', trailerUrl: movie.trailerUrl ?? '',
     description: movie.description ?? '', genres: movie.genres.map((g) => g.id),
   } : blank);
@@ -219,7 +219,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     const nextStep = () => setTask((t) => t && { ...t, current: t.current + 1 });
     const body = {
       title: f.title, description: f.description, poster: f.poster, backdrop: f.backdrop,
-      trailerUrl: f.trailerUrl, genres: f.genres, isPublished: f.isPublished, featured: f.featured,
+      trailerUrl: f.trailerUrl, genres: f.genres, isPublished: f.isPublished,
     };
     try {
       let saved = current;
@@ -332,7 +332,6 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
       <div className="space-y-6">
         <Panel className="space-y-4">
           <label className="flex items-center justify-between gap-3 text-sm font-semibold"><span>Нийтлэх<span className="block text-xs font-normal text-muted-foreground">Асаавал сайтад харагдана.</span></span><Switch checked={f.isPublished} onCheckedChange={(v) => set('isPublished', v)} /></label>
-          <label className="flex items-center justify-between gap-3 text-sm font-semibold">Онцлох<Switch checked={f.featured} onCheckedChange={(v) => set('featured', v)} /></label>
           <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Хадгалж байна…' : movie ? 'Хадгалах' : 'Кино нэмэх'}</Button>
           {movie && f.isPublished && <Button asChild variant="outline" className="w-full"><Link href={`/movies/${movie.slug}`} target="_blank">Урьдчилж харах</Link></Button>}
           {movie && (

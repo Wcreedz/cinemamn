@@ -64,9 +64,10 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 }
 
 export async function requireAdmin(req: Request, _res: Response, next: NextFunction) {
-  // Зөвхөн админ cookie-г уншина. Хэрэглэгчээр нэвтэрсэн хүнд 401 биш "эрхгүй" гэж хариулна.
+  // Зөвхөн админ cookie-г уншина. Хэрэглэгчийн таб хандвал "эрхгүй".
+  // Админ таб бол 401: access дууссан байж болох тул клиент refresh хийх боломжтой. Хэрэглэгчийн сесс үүнд нөлөөлөхгүй.
   if (!(await loadUser(req, 'admin'))) {
-    if (await loadUser(req, 'customer')) throw forbidden();
+    if (scopeOf(req) !== 'admin' && await loadUser(req, 'customer')) throw forbidden();
     throw unauthorized();
   }
   const { allowedAdminIps } = await SettingsService.get('security');

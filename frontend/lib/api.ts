@@ -36,6 +36,10 @@ export const refreshSession = () => {
   return refreshing;
 };
 
+// Сесс сэргэхгүй болсон: дэлгэц "нэвтэрсэн" хэвээр үлдэж алдаа заахгүйн тул Providers сессээ дахин шалгана.
+let onSessionLost: (() => void) | null = null;
+export const setSessionLostHandler = (handler: (() => void) | null) => { onSessionLost = handler; };
+
 // Access cookie дууссан бол refresh хийж хүсэлтийг нэг удаа давтана.
 export async function api<T = unknown>(path: string, opts: Options = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -45,8 +49,9 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
     body: opts.raw ?? opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
     // Хөтчийн "Failed to fetch" нь хэрэглэгчид юу ч хэлэхгүй.
   }).catch(() => { throw new ApiClientError('Сервертэй холбогдож чадсангүй. Интернэт холболтоо шалгаад дахин оролдоно уу.', 0, 'NETWORK'); });
-  if (res.status === 401 && opts.retry !== false && !path.startsWith('/api/auth/')) {
-    if (await refreshSession()) return api<T>(path, { ...opts, retry: false });
+  if (res.status === 401 && !path.startsWith('/api/auth/')) {
+    if (opts.retry !== false && await refreshSession()) return api<T>(path, { ...opts, retry: false });
+    onSessionLost?.();
   }
   const text = await res.text();
   let data: unknown = null;

@@ -19,7 +19,7 @@ worker (Node) ── FFmpeg ──▶ /srv/mongolflix/hls        MongoDB
 
 | Сервис | Эх сурвалж | Агуулга |
 |---|---|---|
-| `SettingsService` | `system_settings` | general, subscription, video, security, homepage |
+| `SettingsService` | `system_settings` | general, subscription, video, security |
 | `SubscriptionPricingService` | subscription setting | Багц, үнэ. Нэхэмжлэхэд үргэлж кэшгүй уншина |
 | `VideoConfigurationService` | video setting | Хадгалах зам, чанар, FFmpeg |
 

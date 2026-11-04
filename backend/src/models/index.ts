@@ -218,7 +218,7 @@ export const AdminLog = model('AdminLog', adminLogSchema);
 
 // ---------- SystemSetting ----------
 const systemSettingSchema = new Schema({
-  key: { type: String, required: true, unique: true, enum: ['general', 'subscription', 'video', 'security', 'homepage'] },
+  key: { type: String, required: true, unique: true, enum: ['general', 'subscription', 'video', 'security'] },
   value: { type: Schema.Types.Mixed, required: true },
   version: { type: Number, required: true, default: 1 },
   updatedBy: ref('User'),
