@@ -18,7 +18,7 @@ export interface Category { id: string; name: string; slug: string; description?
 
 export interface MovieSummary {
   id: string; title: string; slug: string; poster?: string; backdrop?: string; description?: string;
-  releaseYear?: number; duration?: number; genres: Category[]; featured: boolean; viewCount: number; playable: boolean;
+  releaseYear?: number; duration?: number; genres: Category[]; featured: boolean; adultOnly: boolean; viewCount: number; playable: boolean;
 }
 export interface MovieDetail extends MovieSummary {
   originalTitle?: string; trailerUrl?: string; cast: string[]; director?: string; language?: string; country?: string;

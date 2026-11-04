@@ -4,6 +4,7 @@ import { env } from '../src/config/env';
 import { AdminLog, Category, Movie, Payment, SiteVisit, Subscription, User, VideoJob } from '../src/models';
 import { VideoService } from '../src/services/video.service';
 import { visitDay, VisitService } from '../src/services/visit.service';
+import { isAdultCategory } from '../src/controllers/movie.controller';
 import { api, login, makeMovie, resetDb, startDb, stopDb, uploadVideo } from './helpers';
 
 const movieBody = (over = {}) => ({ title: 'Шинэ кино', slug: 'shine-kino', description: 'тайлбар', isPublished: true, genres: [], cast: ['A'], ...over });
@@ -54,6 +55,23 @@ describe('Админ удирдлага', () => {
     const upd = await agent.put(`/api/admin/movies/${old._id}`).send({ ...minimal, title: 'Зассан' });
     expect(upd.status).toBe(200);
     expect(upd.body).toMatchObject({ title: 'Зассан', slug: old.slug, cast: ['Жүжигчин'], director: 'Найруулагч', releaseYear: 1999, duration: 5400, language: 'Монгол', country: 'Монгол' });
+  });
+
+  it('киноны +18 ангиллаас 18 нас асуух тэмдэг тооцогдоно', async () => {
+    expect(['+18', '+ 18', '18+', '18 +', 'Насанд хүрэгчид +18'].every((name) => isAdultCategory({ name }))).toBe(true);
+    expect(['18', '2018+', '+180', 'Инээдэм', ''].some((name) => isAdultCategory({ name }))).toBe(false);
+
+    const { agent } = await login('admin');
+    const adult = (await agent.post('/api/admin/categories').send({ name: '+18', slug: 'adult-18' })).body;
+    const other = (await agent.post('/api/admin/categories').send({ name: 'Инээдэм', slug: 'comedy' })).body;
+    const base = { title: 'Кино', description: '', isPublished: true, featured: false };
+    const { id, slug } = (await agent.post('/api/admin/movies').send({ ...base, genres: [other.id, adult.id] })).body;
+    expect((await api().get(`/api/movies/${slug}`)).body.adultOnly).toBe(true);
+    expect((await api().get('/api/movies')).body.items.find((m: { id: string }) => m.id === id).adultOnly).toBe(true);
+
+    // Ангиллаас хасвал тусдаа тохиргоогүйгээр асуухаа болино.
+    await agent.put(`/api/admin/movies/${id}`).send({ ...base, genres: [other.id] });
+    expect((await api().get(`/api/movies/${slug}`)).body.adultOnly).toBe(false);
   });
 
   it('slug гарчгаас автоматаар үүсч, давхцвал дугаар авна', async () => {

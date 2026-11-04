@@ -24,6 +24,7 @@ export function MovieCard({ movie, progress, resume, note }: { movie: MovieSumma
     <Link href={canResume ? `/watch/${movie.slug}` : `/movies/${movie.slug}`} className="group block w-full">
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-muted">
         <Poster src={movie.poster} title={movie.title} className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        {movie.adultOnly && <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">18+</span>}
         {comingSoon ? (
           <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white"><Clock className="size-3" />Тун удахгүй</span>
         ) : (

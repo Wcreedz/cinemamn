@@ -37,6 +37,7 @@ export default function MovieDetailPage() {
         <div className="min-w-0 flex-1 md:pt-24">
           <h1 className="text-3xl font-black md:text-4xl">{m.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {m.adultOnly && <Badge tone="primary">18+</Badge>}
             {m.releaseYear && <span>{m.releaseYear}</span>}
             {m.duration ? <span>{runtime(m.duration)}</span> : null}
             {m.genres.map((g) => <Badge key={g.id}>{g.name}</Badge>)}

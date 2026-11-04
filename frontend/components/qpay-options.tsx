@@ -3,12 +3,11 @@ import { Building2, QrCode } from 'lucide-react';
 import { Card } from '@/components/ui/misc';
 
 // Жижиг дэлгэцэд банкны апп-ууд, том дэлгэцэд QR код.
-export function QPayOptions({ qr, amount, feeNote }: { qr: NonNullable<PaymentView['qr']>; amount: string; feeNote?: string }) {
+export function QPayOptions({ qr, amount }: { qr: NonNullable<PaymentView['qr']>; amount: string }) {
   return (
     <>
       <Card className="block p-4 sm:hidden">
         <p className="text-center text-lg font-bold">{amount}</p>
-        {feeNote && <p className="text-center text-xs text-muted-foreground">{feeNote}</p>}
         {qr.urls.map((item) => (
           <a key={item.link} href={item.link} className="flex items-center justify-between gap-3 border-b p-2 last:border-b-0">
             {item.logo ? <img src={item.logo} alt="" className="size-8 rounded-md" /> : <span className="size-8" />}
@@ -26,10 +25,7 @@ export function QPayOptions({ qr, amount, feeNote }: { qr: NonNullable<PaymentVi
           <QrCode className="size-8 text-muted-foreground" />
         </div>
         <div className="flex flex-col items-center gap-4">
-          <div className="text-center">
-            <p className="text-2xl font-semibold">{amount}</p>
-            {feeNote && <p className="text-xs text-muted-foreground">{feeNote}</p>}
-          </div>
+          <p className="text-center text-2xl font-semibold">{amount}</p>
           <p className="text-center text-muted-foreground">Та доорх QR кодыг уншуулж төлбөрөө төлнө үү.</p>
           {qr.image && (
             <div className="rounded-md bg-muted p-4">

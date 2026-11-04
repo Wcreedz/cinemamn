@@ -71,7 +71,8 @@ function Pay() {
   }
   return (
     <div className="mx-auto max-w-md space-y-4">
-      {p.qr && <QPayOptions qr={p.qr} amount={money(p.amount, p.currency)} feeNote={p.fee ? `${money(p.price, p.currency)} + QPay шимтгэл ${money(p.fee, p.currency)}` : undefined} />}
+      {/* Сайт дээр үндсэн үнэ харагдана. Шимтгэл (p.fee) зөвхөн QR, банкны апп дахь нэхэмжлэхийн дүнд (p.amount) орно. */}
+      {p.qr && <QPayOptions qr={p.qr} amount={money(p.price, p.currency)} />}
       {note && <Notice tone="warning">{note}</Notice>}
       <Button className="w-full" disabled={checking} onClick={() => void check()}>{checking ? 'Шалгаж байна…' : 'Төлбөр шалгах'}</Button>
       {process.env.NODE_ENV !== 'production' && (

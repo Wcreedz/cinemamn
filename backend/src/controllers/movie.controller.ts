@@ -11,9 +11,13 @@ const categoryView = (c: any) => ({ id: String(c._id), name: c.name, slug: c.slu
 // Өмнө нь бүтэн хаягаар хадгалсан зургуудыг одоогийн домэйнд хүчинтэй зам болгоно.
 const mediaPath = (url?: string) => url?.replace(/^https?:\/\/[^/]+(\/media\/)/, '$1');
 
+// Тусдаа тохиргоогүй: киноны "+18" ангилал л 18 нас асуух эсэхийг шийднэ. "18+", "18 +" бичлэгийг ч таньна.
+const ADULT_CATEGORY = /\+\s*18(?!\d)|(?<!\d)18\s*\+/;
+export const isAdultCategory = (c: any) => ADULT_CATEGORY.test(c?.name ?? '');
+
 export const movieSummary = (m: any) => ({
   id: String(m._id), title: m.title, slug: m.slug, poster: mediaPath(m.poster), backdrop: mediaPath(m.backdrop), description: m.description,
-  releaseYear: m.releaseYear, duration: m.duration, featured: m.featured, viewCount: m.viewCount, playable: isPlayable(m),
+  releaseYear: m.releaseYear, duration: m.duration, featured: m.featured, adultOnly: (m.genres ?? []).some(isAdultCategory), viewCount: m.viewCount, playable: isPlayable(m),
   genres: (m.genres ?? []).filter((g: any) => g?.name).map(categoryView),
 });
 export const movieDetail = (m: any) => ({

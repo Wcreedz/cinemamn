@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { ArrowLeft } from 'lucide-react';
 import type { MovieDetail, PlaybackGrant } from '@mongolflix/shared';
+import { AgeGate } from '@/components/age-gate';
 import { Button } from '@/components/ui/button';
 import { ErrorState, Spinner } from '@/components/ui/misc';
 import { VideoPlayerControls } from '@/components/video-player-controls';
@@ -25,6 +26,9 @@ export default function WatchPage() {
   const [level, setLevel] = useState(-1);
   const [ready, setReady] = useState(false);
   const [fill, setFill] = useState(false);
+  // Зөвхөн энэ кинонд, энэ удаа хүчинтэй: дараагийн үзэлт бүрт дахин асууна.
+  const [ageConfirmedSlug, setAgeConfirmedSlug] = useState<string | null>(null);
+  const ageConfirmed = ageConfirmedSlug === slug;
   // Хуудаснаас гарах үед видео аль хэдийн салгагдсан байдаг: сүүлийн байрлалыг тусад нь хадгална.
   const position = useRef({ time: 0, duration: 0 });
 
@@ -89,6 +93,8 @@ export default function WatchPage() {
       const m = await api<MovieDetail>(`/api/movies/${slug}`);
       if (cancelled) return;
       setMovie(m);
+      // Хариулт өгөхөөс өмнө стрим токен авахгүй, үзэлт ч эхлэхгүй.
+      if (m.adultOnly && !ageConfirmed) return;
       await start(m);
     })().catch((e) => setError({ message: (e as Error).message, code: (e as ApiClientError).code }));
 
@@ -97,7 +103,7 @@ export default function WatchPage() {
       hlsRef.current?.destroy();
       hlsRef.current = null;
     };
-  }, [slug]);
+  }, [slug, ageConfirmed]);
 
   useEffect(() => {
     const t = setInterval(saveProgress, PROGRESS_EVERY_MS);
@@ -125,6 +131,14 @@ export default function WatchPage() {
   );
 
   if (gone) return <main className="flex min-h-dvh items-center justify-center bg-black"><Spinner className="size-10" /></main>;
+  if (!error && movie?.slug === slug && movie.adultOnly && !ageConfirmed) {
+    return (
+      <main className="h-dvh bg-black">
+        {/* replace: "буцах" дарахад асуулт дахин гарч ирэхгүй. */}
+        <AgeGate title={movie.title} onConfirm={() => setAgeConfirmedSlug(slug)} onDecline={() => router.replace(`/movies/${movie.slug}`)} />
+      </main>
+    );
+  }
   return (
     <main className="relative h-dvh overflow-hidden bg-black">
       {error ? (
