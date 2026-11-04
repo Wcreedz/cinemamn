@@ -8,7 +8,7 @@ import { Input, Label } from '@/components/ui/input';
 import { Card, Notice } from '@/components/ui/misc';
 import { api, ApiClientError } from '@/lib/api';
 import { date } from '@/lib/utils';
-import { PasswordInput, PIN_LENGTH } from '@/components/ui/password-input';
+import { PIN_LENGTH } from '@/components/ui/password-input';
 import { PinField, PinSteps } from '@/components/ui/pin-field';
 
 function Profile() {
@@ -40,10 +40,9 @@ function Profile() {
 }
 const PIN_STEPS = 3;
 
-// Одоогийн нууц үг → шинэ → давтан. 4 оронтой дүрмээс өмнөх хэрэглэгчийн одоогийн нууц үг урт байж болно.
+// Одоогийн нууц үг → шинэ → давтан.
 function ChangePassword() {
   const [step, setStep] = useState(0);
-  const [legacy, setLegacy] = useState(false);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -60,7 +59,7 @@ function ChangePassword() {
     setBusy(true);
     try {
       await api('/api/auth/change-password', { body: { currentPassword: current, newPassword: next } });
-      setCurrent(''); clearNew(); setStep(0); setLegacy(false);
+      setCurrent(''); clearNew(); setStep(0);
       setMsg({ ok: true, text: 'Нууц үг солигдлоо. Бусад төхөөрөмж гарсан.' });
     } catch (err) {
       setMsg({ ok: false, text: (err as Error).message });
@@ -75,17 +74,14 @@ function ChangePassword() {
     if (step < PIN_STEPS - 1) setStep(step + 1);
     else void finish();
   };
-  const ready = [legacy ? current.length > 0 : current.length === PIN_LENGTH, next.length === PIN_LENGTH, confirm.length === PIN_LENGTH][step];
+  const ready = [current, next, confirm][step].length === PIN_LENGTH;
 
   return (
     <Card className="mt-5 max-w-md p-5">
       <h2 className="mb-4 font-bold">Нууц үг солих</h2>
       <form onSubmit={submit} className="space-y-4">
         <PinSteps step={step} total={PIN_STEPS} />
-        {step === 0 && (legacy
-          ? <div><Label htmlFor="current">Одоогийн нууц үг</Label><PasswordInput id="current" autoComplete="current-password" required autoFocus value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
-          : <PinField key="current" id="current" label="Одоогийн нууц үг" hint="Баталгаажуулахын тулд одоогийн нууц үгээ оруулна уу." autoComplete="current-password" value={current} onValue={setCurrent} />)}
-        {step === 0 && <button type="button" onClick={() => { setLegacy(!legacy); setCurrent(''); }} className="block w-full cursor-pointer text-center text-sm text-muted-foreground hover:underline">{legacy ? '4 оронтой нууц үг оруулах' : 'Хуучин урт нууц үгтэй'}</button>}
+        {step === 0 && <PinField key="current" id="current" label="Одоогийн нууц үг" hint="Баталгаажуулахын тулд одоогийн нууц үгээ оруулна уу." autoComplete="current-password" value={current} onValue={setCurrent} />}
         {step === 1 && <PinField key="next" id="next" label="Шинэ нууц үг" hint="4 оронтой шинэ нууц үгээ оруулна уу." autoFocus value={next} onValue={setNext} />}
         {step === 2 && <PinField key="confirm" id="confirm" label="Шинэ нууц үг давтан" hint="Баталгаажуулахын тулд дахин оруулна уу." autoFocus disabled={busy} value={confirm} onValue={setConfirm} />}
         {msg && <Notice tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Notice>}
