@@ -8,7 +8,8 @@ import { Input, Label } from '@/components/ui/input';
 import { Card, Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { date } from '@/lib/utils';
-import { PasswordInput, PinInput } from '@/components/ui/password-input';
+import { PasswordInput } from '@/components/ui/password-input';
+import { PinPad } from '@/components/ui/pin-pad';
 
 function Profile() {
   const { user, setUser } = useApp();
@@ -56,7 +57,7 @@ function ChangePassword() {
       <h2 className="mb-4 font-bold">Нууц үг солих</h2>
       <form onSubmit={(e) => void save(e)} className="space-y-4">
         <div><Label htmlFor="current">Одоогийн нууц үг</Label><PasswordInput id="current" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
-        <div><Label htmlFor="next">Шинэ нууц үг</Label><PinInput id="next" autoComplete="off" required value={next} onValue={setNext} /></div>
+        <PinPad id="next" label="Шинэ 4 оронтой нууц үг" value={next} onValue={setNext} />
         {msg && <Notice tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Notice>}
         <Button type="submit">Солих</Button>
       </form>

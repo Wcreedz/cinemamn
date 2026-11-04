@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className="text-xs text-muted-foreground">{user.role}</span>
             </div>
           )}
-          <Button asChild variant="outline" size="sm"><Link href="/" aria-label="Сайт руу очих"><Globe /><span className="hidden sm:inline">Сайт руу очих</span></Link></Button>
+          <Button asChild variant="outline" size="sm"><Link href="/" target="_blank" aria-label="Сайт руу очих"><Globe /><span className="hidden sm:inline">Сайт руу очих</span></Link></Button>
           {user && (
             <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive hover:text-white" aria-label="Гарах" onClick={() => void logout().then(() => router.push('/admin/login'))}>
               <LogOut /><span className="hidden sm:inline">Гарах</span>

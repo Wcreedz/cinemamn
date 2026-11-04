@@ -23,9 +23,9 @@ export function PasswordInput({ className, ...props }: Omit<React.InputHTMLAttri
   );
 }
 
-const PIN_LENGTH = 4;
+export const PIN_LENGTH = 4;
 
-// Хэрэглэгчийн шинэ нууц үг: зөвхөн 4 оронтой тоо. Нэвтрэх талбарт хэрэглэхгүй, өмнөх нууц үгтэй хэрэглэгч нэвтэрсээр байна.
+// Админ хэрэглэгчийн нууц үг шинэчлэх нягт талбар. Хэрэглэгч өөрөө оруулах хуудсууд PinPad-ыг ашиглана.
 export function PinInput({ onValue, ...props }: Omit<React.ComponentProps<typeof PasswordInput>, 'onChange' | 'value' | 'maxLength' | 'pattern' | 'inputMode'> & { value: string; onValue: (value: string) => void }) {
   return (
     <PasswordInput
