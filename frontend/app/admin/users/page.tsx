@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge, ErrorState, Skeleton } from '@/components/ui/misc';
 import { useApi } from '@/hooks/use-api';
 import { usePagination } from '@/hooks/use-pagination';
-import { date, dateTime } from '@/lib/utils';
+import { dateTime } from '@/lib/utils';
 
 export default function AdminUsers() {
   const [q, setQ] = useState('');
@@ -26,7 +26,7 @@ export default function AdminUsers() {
                 <td className="px-4 py-3"><Link href={`/admin/users/${u.id}`} className="font-semibold text-primary hover:underline">{u.phone}</Link></td>
                 <td className="px-4 py-3">{u.name}</td><td className="px-4 py-3">{u.role}</td>
                 <td className="px-4 py-3"><Badge tone={u.status === 'active' ? 'success' : 'danger'}>{u.status === 'active' ? 'Идэвхтэй' : 'Блоклогдсон'}</Badge></td>
-                <td className="px-4 py-3">{date(u.createdAt)}</td><td className="px-4 py-3">{dateTime(u.lastLoginAt)}</td>
+                <td className="px-4 py-3">{dateTime(u.createdAt)}</td><td className="px-4 py-3">{dateTime(u.lastLoginAt)}</td>
               </tr>
             ))}
           </Table>
