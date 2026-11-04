@@ -26,7 +26,7 @@ export interface MovieDetail extends MovieSummary {
 }
 export interface AdminMovie extends MovieDetail { isPublished: boolean; videoError?: string; videoProgress?: number; videoUploadSeconds?: number; videoProcessSeconds?: number; videoRetryable?: boolean; videoPlayable: boolean; videoUpload?: { fileName: string; percent: number; stalled: boolean }; createdAt: string; updatedAt: string }
 
-export interface Plan { code: string; name: string; price: number; fee: number; total: number; currency: string; durationDays: number; enabled: boolean }
+export interface Plan { code: string; name: string; price: number; currency: string; durationDays: number; enabled: boolean }
 export interface PlansResponse { enabled: boolean; paymentRequired: boolean; currency: string; plans: Plan[]; version: number }
 
 export interface SubscriptionView {
@@ -36,7 +36,7 @@ export interface SubscriptionView {
 export interface SubscriptionMe { hasAccess: boolean; paymentRequired: boolean; expiresAt: string | null; current: SubscriptionView | null }
 
 export interface PaymentView {
-  id: string; orderNumber: string; planCode: string; planName: string; amount: number; fee?: number; currency: string; status: PaymentStatus;
+  id: string; orderNumber: string; planCode: string; planName: string; amount: number; fee?: number; price: number; currency: string; status: PaymentStatus;
   failureReason?: string; paidAt?: string; createdAt: string; expiresAt?: string;
   qr?: { image?: string; text?: string; shortUrl?: string; urls: { name: string; description?: string; logo?: string; link: string }[] };
 }

@@ -33,10 +33,11 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     const { body } = await admin.agent.get('/api/admin/settings');
     await admin.agent.put('/api/admin/settings/subscription').send({ value: { ...body.subscription.value, plans: [{ code: 'MONTHLY', name: 'Сарын эрх', price: 10000, durationDays: 30, enabled: true }] } });
 
-    expect((await api().get('/api/subscriptions/plans')).body.plans[0]).toMatchObject({ price: 10000, fee: 100, total: 10100 });
+    expect((await api().get('/api/subscriptions/plans')).body.plans[0]).toMatchObject({ price: 10000 });
+    expect((await api().get('/api/subscriptions/plans')).body.plans[0].fee).toBeUndefined();
     const buyer = await login();
     const res = await buyer.agent.post('/api/qpayGargaya').send({ planCode: 'MONTHLY', amount: 1 });
-    expect(res.body).toMatchObject({ amount: 10100, fee: 100 });
+    expect(res.body).toMatchObject({ amount: 10100, fee: 100, price: 10000 });
     const doc = (await Payment.findById(res.body.id).lean())!;
     expect(qpay.invoices.get(doc.invoiceId!)!.amount).toBe(10100);
 
@@ -51,7 +52,12 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
 
     qpay.markPaid(doc.invoiceId!);
     expect((await callback(doc.orderNumber)).body.outcome).toBe('paid');
-    expect((await Subscription.findOne({ paymentId: doc._id }).lean())!.amount).toBe(10100);
+    // Шимтгэл зөвхөн нэхэмжлэх дээр: эрх, түүх, админы орлого үндсэн үнээр харагдана.
+    expect((await Subscription.findOne({ paymentId: doc._id }).lean())!.amount).toBe(10000);
+    expect((await buyer.agent.get('/api/payments/history')).body.items[0]).toMatchObject({ amount: 10100, price: 10000 });
+    const dashboard = (await admin.agent.get('/api/admin/dashboard')).body;
+    expect(dashboard.monthlyRevenue[0].total).toBe(10000);
+    expect(dashboard.recentPayments.find((p: { id: string }) => p.id === res.body.id).price).toBe(10000);
   });
 
   it('багцын харилцагчийн бүтцээр нэхэмжлэх үүсгэж QR буцаана', async () => {

@@ -29,7 +29,7 @@ export async function dashboard(_req: Request, res: Response) {
     Subscription.distinct('userId', { status: 'active', startedAt: { $lte: now }, expiresAt: { $gt: now } }),
     Subscription.distinct('userId'),
     Payment.countDocuments({ status: 'paid' }),
-    Payment.aggregate([{ $match: { status: 'paid', paidAt: { $gte: monthStart } } }, { $group: { _id: '$currency', total: { $sum: '$amount' }, count: { $sum: 1 } } }]),
+    Payment.aggregate([{ $match: { status: 'paid', paidAt: { $gte: monthStart } } }, { $group: { _id: '$currency', total: { $sum: { $subtract: ['$amount', { $ifNull: ['$fee', 0] }] } }, count: { $sum: 1 } } }]),
     Payment.find().sort({ createdAt: -1 }).limit(10).populate('userId', 'phone').lean(),
     Movie.find().sort({ viewCount: -1 }).limit(5).select('title slug viewCount').lean(),
     Movie.aggregate([{ $group: { _id: '$videoStatus', count: { $sum: 1 } } }]),

@@ -59,7 +59,7 @@ export default function AdminUserDetail() {
         </Panel>
       </div>
       <h2 className="mb-3 mt-8 font-bold">Төлбөрийн түүх</h2>
-      <Table head={['Захиалга', 'Дүн', 'Төлөв', 'Огноо']}>{d.payments.map((p) => <tr key={p.id}><td className="px-4 py-3 font-mono text-xs">{p.orderNumber}</td><td className="px-4 py-3">{money(p.amount, p.currency)}</td><td className="px-4 py-3">{p.status}</td><td className="px-4 py-3">{dateTime(p.createdAt)}</td></tr>)}</Table>
+      <Table head={['Захиалга', 'Дүн', 'Төлөв', 'Огноо']}>{d.payments.map((p) => <tr key={p.id}><td className="px-4 py-3 font-mono text-xs">{p.orderNumber}</td><td className="px-4 py-3">{money(p.price, p.currency)}</td><td className="px-4 py-3">{p.status}</td><td className="px-4 py-3">{dateTime(p.createdAt)}</td></tr>)}</Table>
       <h2 className="mb-3 mt-8 font-bold">Эрхийн түүх</h2>
       <Table head={['Багц', 'Төлөв', 'Эхлэх', 'Дуусах']}>{d.subscriptions.map((s) => <tr key={s.id}><td className="px-4 py-3">{s.planCode}</td><td className="px-4 py-3">{s.status}</td><td className="px-4 py-3">{date(s.startedAt)}</td><td className="px-4 py-3">{date(s.expiresAt)}</td></tr>)}</Table>
       <h2 className="mb-3 mt-8 font-bold">Үзсэн түүх</h2>

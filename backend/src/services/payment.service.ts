@@ -4,7 +4,7 @@ import { env } from '../config/env';
 import { IPayment, Payment, Subscription } from '../models';
 import { AppError, conflict, notFound } from '../utils/errors';
 import { CheckResult, QPayGateway } from './qpay.gateway';
-import { SubscriptionPricingService } from './subscriptionPricing.service';
+import { paymentPrice, SubscriptionPricingService } from './subscriptionPricing.service';
 import { SubscriptionService } from './subscription.service';
 
 const QPAY_CURRENCY = 'MNT';
@@ -176,7 +176,7 @@ export const PaymentService = {
   view(p: IPayment) {
     const open = p.status === 'pending';
     return {
-      id: String(p._id), orderNumber: p.orderNumber, planCode: p.planCode, planName: p.planName, amount: p.amount, fee: p.fee, currency: p.currency,
+      id: String(p._id), orderNumber: p.orderNumber, planCode: p.planCode, planName: p.planName, amount: p.amount, fee: p.fee, price: paymentPrice(p), currency: p.currency,
       status: p.status, failureReason: p.failureReason, paidAt: p.paidAt, createdAt: p.createdAt, expiresAt: p.expiresAt,
       ...(open && p.qr ? { qr: { image: p.qr.image, text: p.qr.text, shortUrl: p.qr.shortUrl, urls: p.qr.urls ?? [] } } : {}),
     };

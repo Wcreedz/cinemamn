@@ -212,6 +212,7 @@ describe('Админ удирдлага', () => {
 
   it('буцаалтыг зөвхөн superadmin бүртгэж, холбогдох эрх цуцлагдана', async () => {
     const { user } = await login();
+    // fee-гүй хуучин төлбөр: үндсэн үнэ нь нийт дүнтэйгээ тэнцүү.
     const p = await Payment.create({ userId: user._id, orderNumber: 'MFTESTORDER01', amount: 14900, currency: 'MNT', planCode: 'MONTHLY', planName: 'С', durationDays: 30, pricingVersion: 1, qpayBaiguullagiinId: 'org-1', qpayBarilgiinId: 'branch-1', status: 'paid' });
     const sub = await Subscription.create({ seq: 1, userId: user._id, planCode: 'MONTHLY', amount: 14900, currency: 'MNT', status: 'active', startedAt: new Date(), expiresAt: new Date(Date.now() + 1e9), paymentId: p._id });
     await Payment.updateOne({ _id: p._id }, { $set: { subscriptionId: sub._id } });

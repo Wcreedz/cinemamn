@@ -10,7 +10,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { useApi } from '@/hooks/use-api';
 import { usePagination } from '@/hooks/use-pagination';
 import { api } from '@/lib/api';
-import { date, money } from '@/lib/utils';
+import { accessLabel, date, money } from '@/lib/utils';
 
 const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
   paid: { label: 'Төлөгдсөн', tone: 'success' }, pending: { label: 'Хүлээгдэж буй', tone: 'warning' },
@@ -44,7 +44,7 @@ function Content() {
       <Card className="p-5">
         {me.loading ? <Skeleton className="h-12" /> : me.data?.hasAccess && me.data.expiresAt ? (
           <div className="flex items-center gap-3"><Crown className="size-8 text-warning" />
-            <div><p className="font-bold">Таны эрх идэвхтэй</p><p className="text-sm text-muted-foreground">Дуусах огноо: {date(me.data.expiresAt)}</p></div>
+            <div><p className="font-bold">Та {accessLabel(plans.data?.plans.find((p) => p.code === me.data?.current?.planCode)?.durationDays).toLowerCase()}тэй</p><p className="text-sm text-muted-foreground">Дуусах огноо: {date(me.data.expiresAt)}</p></div>
           </div>
         ) : me.data?.hasAccess ? <p className="font-bold">Төлбөргүйгээр үзэх боломжтой.</p> : <p className="font-bold">Танд идэвхтэй эрх алга байна.</p>}
       </Card>
@@ -56,8 +56,8 @@ function Content() {
             {plans.data?.plans.map((p) => (
               <Card key={p.code} className="flex flex-col p-5">
                 <p className="font-bold">{p.name}</p>
-                <p className="mt-2 text-3xl font-black text-primary">{money(p.total, p.currency)}</p>
-                <p className="text-xs text-muted-foreground">{money(p.price, p.currency)} + QPay шимтгэл {money(p.fee, p.currency)}</p>
+                <p className="mt-2 text-3xl font-black text-primary">{money(p.price, p.currency)}</p>
+                <p className="mt-1 text-sm font-semibold">{accessLabel(p.durationDays)}</p>
                 <p className="text-sm text-muted-foreground">{p.durationDays} хоног</p>
                 <ul className="my-4 space-y-1 text-sm">
                   <li className="flex items-center gap-2"><Check className="size-4 text-success" />Бүх кино үзэх</li>
@@ -75,7 +75,7 @@ function Content() {
           <><Card className="divide-y">
             {history.data.items.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                <div><p className="font-semibold">{p.planName} · {money(p.amount, p.currency)}</p><p className="text-xs text-muted-foreground">{date(p.createdAt)} · {p.orderNumber}</p></div>
+                <div><p className="font-semibold">{p.planName} · {money(p.price, p.currency)}</p><p className="text-xs text-muted-foreground">{date(p.createdAt)} · {p.orderNumber}</p></div>
                 <Badge tone={STATUS[p.status].tone}>{STATUS[p.status].label}</Badge>
               </div>
             ))}

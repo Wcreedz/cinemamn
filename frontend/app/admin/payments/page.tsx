@@ -60,7 +60,7 @@ export default function AdminPayments() {
               <tr key={p.id}>
                 <td className="px-4 py-3"><p className="font-mono text-xs">{p.orderNumber}</p><p className="max-w-52 truncate text-xs text-muted-foreground" title={p.invoiceId}>{p.invoiceId}</p></td>
                 <td className="px-4 py-3">{p.phone}</td>
-                <td className="px-4 py-3 font-semibold">{money(p.amount, p.currency)}</td>
+                <td className="px-4 py-3 font-semibold">{money(p.price, p.currency)}</td>
                 <td className="px-4 py-3"><Badge tone={TONE[p.status]}>{p.status}</Badge>{p.failureReason && <p className="mt-1 text-xs text-destructive">{p.failureReason}</p>}{p.verificationNote && <p className="mt-1 max-w-52 text-xs text-muted-foreground">{p.verificationNote}</p>}</td>
                 <td className="px-4 py-3">{dateTime(p.createdAt)}</td>
                 <td className="space-x-1 whitespace-nowrap px-4 py-3 text-right">

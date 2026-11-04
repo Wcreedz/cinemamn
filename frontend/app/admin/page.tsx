@@ -39,7 +39,7 @@ export default function AdminDashboard() {
       </div>
       <h2 className="mb-3 mt-8 font-bold">Сүүлийн гүйлгээ</h2>
       <Table head={['Захиалга', 'Утас', 'Дүн', 'Төлөв', 'Огноо']}>
-        {d.recentPayments.map((p) => <tr key={p.id}><td className="px-4 py-3 font-mono text-xs">{p.orderNumber}</td><td className="px-4 py-3">{p.phone}</td><td className="px-4 py-3">{money(p.amount, p.currency)}</td><td className="px-4 py-3">{p.status}</td><td className="px-4 py-3">{dateTime(p.createdAt)}</td></tr>)}
+        {d.recentPayments.map((p) => <tr key={p.id}><td className="px-4 py-3 font-mono text-xs">{p.orderNumber}</td><td className="px-4 py-3">{p.phone}</td><td className="px-4 py-3">{money(p.price, p.currency)}</td><td className="px-4 py-3">{p.status}</td><td className="px-4 py-3">{dateTime(p.createdAt)}</td></tr>)}
       </Table>
     </>
   );

@@ -1,6 +1,7 @@
 import type { Types } from 'mongoose';
 import { IPayment, ISubscription, Subscription, User } from '../models';
 import { conflict, notFound } from '../utils/errors';
+import { paymentPrice } from './subscriptionPricing.service';
 import { SettingsService } from './settings.service';
 
 const DAY = 86_400_000;
@@ -36,7 +37,7 @@ export const SubscriptionService = {
     if (existing) return { sub: existing, created: false };
     try {
       const sub = await insertPeriod(payment.userId, paidAt, payment.durationDays, {
-        planCode: payment.planCode, amount: payment.amount, currency: payment.currency, paymentId: payment._id,
+        planCode: payment.planCode, amount: paymentPrice(payment), currency: payment.currency, paymentId: payment._id,
       });
       return { sub, created: true };
     } catch (err) {
