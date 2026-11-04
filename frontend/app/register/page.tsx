@@ -10,7 +10,7 @@ import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { authHref, safeNext } from '@/lib/auth-entry';
-import { PasswordInput } from '@/components/ui/password-input';
+import { PinInput } from '@/components/ui/password-input';
 
 function RegisterForm() {
   const router = useRouter();
@@ -36,7 +36,7 @@ function RegisterForm() {
     <>
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-        <div><Label htmlFor="password">Нууц үг</Label><PasswordInput id="password" autoComplete="off" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+        <div><Label htmlFor="password">Нууц үг</Label><PinInput id="password" autoComplete="off" required value={password} onValue={setPassword} /></div>
         {error && <Notice tone="danger">{error}</Notice>}
         <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Үүсгэж байна…' : 'Бүртгэл үүсгэх'}</Button>
       </form>

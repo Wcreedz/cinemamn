@@ -22,3 +22,20 @@ export function PasswordInput({ className, ...props }: Omit<React.InputHTMLAttri
     </div>
   );
 }
+
+const PIN_LENGTH = 4;
+
+// Хэрэглэгчийн шинэ нууц үг: зөвхөн 4 оронтой тоо. Нэвтрэх талбарт хэрэглэхгүй, өмнөх нууц үгтэй хэрэглэгч нэвтэрсээр байна.
+export function PinInput({ onValue, ...props }: Omit<React.ComponentProps<typeof PasswordInput>, 'onChange' | 'value' | 'maxLength' | 'pattern' | 'inputMode'> & { value: string; onValue: (value: string) => void }) {
+  return (
+    <PasswordInput
+      {...props}
+      inputMode="numeric"
+      maxLength={PIN_LENGTH}
+      pattern={`[0-9]{${PIN_LENGTH}}`}
+      title="4 оронтой тоо оруулна уу"
+      placeholder="4 оронтой тоо"
+      onChange={(e) => onValue(e.target.value.replace(/[^0-9]/g, '').slice(0, PIN_LENGTH))}
+    />
+  );
+}

@@ -19,24 +19,48 @@ describe('Нэвтрэлт', () => {
 
   it('утас, нууц үгээр бүртгүүлж шууд нэвтэрнэ, нууц үг argon2id-ээр хадгалагдана', async () => {
     const agent = request.agent(app);
-    const reg = await agent.post('/api/auth/register').send({ phone: '9911 2233', password: 'Strong-pass-1', name: 'Бат' });
+    const reg = await agent.post('/api/auth/register').send({ phone: '9911 2233', password: '1234', name: 'Бат' });
     expect(reg.status).toBe(201);
     expect(([] as string[]).concat(reg.headers['set-cookie']).join(';')).toMatch(/HttpOnly/);
     const u = await User.findOne({ phone: '+97699112233' }).select('+passwordHash').lean();
     expect(u!.passwordHash.startsWith('$argon2id$')).toBe(true);
     expect((await agent.get('/api/auth/me')).body.user.phone).toBe('+97699112233');
-    expect((await api().post('/api/auth/login').send({ phone: '99112233', password: 'Strong-pass-1' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone: '99112233', password: '1234' })).status).toBe(200);
   });
 
-  it('нэр заавал биш, нууц үг ямар ч урттай байж болно', async () => {
-    const res = await api().post('/api/auth/register').send({ phone: '99112277', password: '1' });
+  it('нэр заавал биш', async () => {
+    const res = await api().post('/api/auth/register').send({ phone: '99112277', password: '0007' });
     expect(res.status).toBe(201);
     expect(res.body.user.name).toBe('');
-    expect((await api().post('/api/auth/login').send({ phone: '99112277', password: '1' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone: '99112277', password: '0007' })).status).toBe(200);
+  });
+
+  it('хэрэглэгчийн шинэ нууц үг яг 4 оронтой тоо байна', async () => {
+    const message = 'Нууц үг 4 оронтой тоо байх ёстой.';
+    const { agent, user, phone, password } = await login();
+    for (const bad of ['123', '12345', '12a4', 'abcd', ' 123', '\u0661\u0662\u0663\u0664', '1234\n']) {
+      const reg = await api().post('/api/auth/register').send({ phone: '99112299', password: bad });
+      expect(reg.status).toBe(400);
+      expect(reg.body.error.message).toBe(message);
+      expect((await api().post('/api/auth/reset-password').send({ phone, password: bad, confirmPassword: bad })).status).toBe(400);
+      expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: bad })).status).toBe(400);
+    }
+    expect((await api().post('/api/auth/register').send({ phone: '99112299', password: 1234 })).status).toBe(400);
+    expect(await User.exists({ phone: '+97699112299' })).toBeNull();
+    // Татгалзсан оролдлого нууц үгийг өөрчлөхгүй.
+    expect((await api().post('/api/auth/login').send({ phone: user.phone, password })).status).toBe(200);
+  });
+
+  it('өмнөх урт нууц үгтэй хэрэглэгч нэвтэрсээр, солихдоо 4 оронтой болно', async () => {
+    const { agent, phone, password } = await login();
+    expect(password.length).toBeGreaterThan(4);
+    expect((await api().post('/api/auth/login').send({ phone, password })).status).toBe(200);
+    expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: '4321' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone, password: '4321' })).status).toBe(200);
   });
 
   it('бүртгэл: давхар дугаар, буруу дугаар, хоосон нууц үгийг татгалзана', async () => {
-    const body = { phone: '99112244', password: 'Strong-pass-1' };
+    const body = { phone: '99112244', password: '1234' };
     expect((await api().post('/api/auth/register').send(body)).status).toBe(201);
     const dup = await api().post('/api/auth/register').send(body);
     expect(dup.status).toBe(409);
@@ -50,17 +74,17 @@ describe('Нэвтрэлт', () => {
     const noPassword = await api().post('/api/auth/register').send({ phone: '99112288', password: '' });
     expect(noPassword.status).toBe(400);
     expect(noPassword.body.error.message).toBe('Нууц үгээ оруулна уу.');
-    const noPhone = await api().post('/api/auth/register').send({ password: 'x' });
+    const noPhone = await api().post('/api/auth/register').send({ password: '1234' });
     expect(noPhone.body.error.message).toBe('Утасны дугаараа оруулна уу.');
-    const shortPhone = await api().post('/api/auth/register').send({ phone: '123', password: 'x' });
+    const shortPhone = await api().post('/api/auth/register').send({ phone: '123', password: '1234' });
     expect(shortPhone.body.error.message).toContain('8 оронтой');
-    const taken = await api().post('/api/auth/register').send({ phone: '99112288', password: 'x' });
+    const taken = await api().post('/api/auth/register').send({ phone: '99112288', password: '1234' });
     expect(taken.status).toBe(201);
-    expect((await api().post('/api/auth/register').send({ phone: '99112288', password: 'x' })).body.error.message).toContain('бүртгэл үүссэн');
+    expect((await api().post('/api/auth/register').send({ phone: '99112288', password: '1234' })).body.error.message).toContain('бүртгэл үүссэн');
   });
 
   it('бүртгэлээр эрх, төлөв өөрчилж чадахгүй', async () => {
-    const res = await api().post('/api/auth/register').send({ phone: '99112266', password: 'Strong-pass-1', role: 'superadmin', status: 'blocked', email: 'x@example.com' });
+    const res = await api().post('/api/auth/register').send({ phone: '99112266', password: '1234', role: 'superadmin', status: 'blocked', email: 'x@example.com' });
     expect(res.status).toBe(201);
     const u = await User.findOne({ phone: '+97699112266' }).lean();
     expect(u!.role).toBe('user');
@@ -70,35 +94,35 @@ describe('Нэвтрэлт', () => {
 
   it('хэрэглэгч утас, шинэ нууц үгээр нууц үгээ сольж, хуучин сешн хаагдана', async () => {
     const { agent, phone, password } = await login();
-    const res = await api().post('/api/auth/reset-password').send({ phone, password: 'Шинэ1', confirmPassword: 'Шинэ1' });
+    const res = await api().post('/api/auth/reset-password').send({ phone, password: '5678', confirmPassword: '5678' });
     expect(res.status).toBe(200);
     expect((await api().post('/api/auth/login').send({ phone, password })).status).toBe(401);
-    expect((await api().post('/api/auth/login').send({ phone, password: 'Шинэ1' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone, password: '5678' })).status).toBe(200);
     expect((await agent.post('/api/auth/refresh')).status).toBe(401);
   });
 
   it('нууц үг солих: давталт таарахгүй, бүртгэлгүй дугаарыг татгалзана', async () => {
     const { phone } = await login();
-    const mismatch = await api().post('/api/auth/reset-password').send({ phone, password: 'a', confirmPassword: 'b' });
+    const mismatch = await api().post('/api/auth/reset-password').send({ phone, password: '1111', confirmPassword: '2222' });
     expect(mismatch.status).toBe(400);
     expect(mismatch.body.error.message).toBe('Нууц үг таарахгүй байна.');
-    expect((await api().post('/api/auth/reset-password').send({ phone: '88000000', password: 'a', confirmPassword: 'a' })).status).toBe(404);
+    expect((await api().post('/api/auth/reset-password').send({ phone: '88000000', password: '1111', confirmPassword: '1111' })).status).toBe(404);
   });
 
   it('админы нууц үгийг энэ замаар солих боломжгүй', async () => {
     for (const role of ['admin', 'superadmin'] as const) {
       const { phone, email, password } = await login(role);
-      expect((await api().post('/api/auth/reset-password').send({ phone, password: 'hacked', confirmPassword: 'hacked' })).status).toBe(404);
+      expect((await api().post('/api/auth/reset-password').send({ phone, password: '6666', confirmPassword: '6666' })).status).toBe(404);
       expect((await api().post('/api/auth/admin/login').send({ email, password })).status).toBe(200);
-      expect((await api().post('/api/auth/admin/login').send({ email, password: 'hacked' })).status).toBe(401);
+      expect((await api().post('/api/auth/admin/login').send({ email, password: '6666' })).status).toBe(401);
     }
   });
 
   it('блоклогдсон хэрэглэгч нууц үг солиод ч нэвтрэхгүй', async () => {
     const { user, phone } = await login();
     await User.updateOne({ _id: user._id }, { $set: { status: 'blocked' } });
-    expect((await api().post('/api/auth/reset-password').send({ phone, password: 'x', confirmPassword: 'x' })).status).toBe(200);
-    expect((await api().post('/api/auth/login').send({ phone, password: 'x' })).status).toBe(403);
+    expect((await api().post('/api/auth/reset-password').send({ phone, password: '1212', confirmPassword: '1212' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone, password: '1212' })).status).toBe(403);
   });
 
   it('SMS, OTP-ийн замууд байхгүй', async () => {
@@ -175,12 +199,12 @@ describe('Нэвтрэлт', () => {
     const other = request.agent(app);
     await other.post('/api/auth/login').send({ phone, password });
 
-    expect((await agent.post('/api/auth/change-password').send({ currentPassword: 'wrong', newPassword: 'New-password-123' })).status).toBe(400);
+    expect((await agent.post('/api/auth/change-password').send({ currentPassword: 'wrong', newPassword: '4321' })).status).toBe(400);
     expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: '' })).status).toBe(400);
-    expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: 'New-password-123' })).status).toBe(200);
+    expect((await agent.post('/api/auth/change-password').send({ currentPassword: password, newPassword: '4321' })).status).toBe(200);
 
     expect((await api().post('/api/auth/login').send({ phone, password })).status).toBe(401);
-    expect((await api().post('/api/auth/login').send({ phone, password: 'New-password-123' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone, password: '4321' })).status).toBe(200);
     expect((await other.post('/api/auth/refresh')).status).toBe(401);
     expect((await agent.post('/api/auth/refresh')).status).toBe(200);
     expect((await agent.get('/api/auth/me')).status).toBe(200);

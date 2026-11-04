@@ -4,7 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { unauthorized } from '../utils/errors';
 import { clientIp, parse } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
-import { adminLoginSchema, changePasswordSchema, loginSchema, profileSchema, registerSchema, resetPasswordSchema } from '../validators';
+import { adminLoginSchema, changePasswordSchema, loginSchema, newPasswordFieldFor, profileSchema, registerSchema, resetPasswordSchema } from '../validators';
 
 const meta = (req: Request) => ({ ip: clientIp(req), userAgent: req.headers['user-agent'] });
 
@@ -76,6 +76,7 @@ export async function me(req: Request, res: Response) {
 
 export async function changePassword(req: Request, res: Response) {
   const { currentPassword, newPassword } = parse(changePasswordSchema, req.body);
+  parse(newPasswordFieldFor(req.user!.role), newPassword);
   await AuthService.changePassword(req.user!._id, currentPassword, newPassword);
   // Бусад төхөөрөмж гарсан, энэ төхөөрөмж шинэ сешнтэй үргэлжилнэ.
   await startSession(req, res, scopeOf(req), req.user!);

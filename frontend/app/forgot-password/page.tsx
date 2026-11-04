@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Notice } from '@/components/ui/misc';
 import { api } from '@/lib/api';
-import { PasswordInput } from '@/components/ui/password-input';
+import { PinInput } from '@/components/ui/password-input';
 
 export default function ForgotPasswordPage() {
   const [phone, setPhone] = useState('');
@@ -43,8 +43,8 @@ export default function ForgotPasswordPage() {
       ) : (
         <form onSubmit={(e) => void submit(e)} className="space-y-4">
           <div><Label htmlFor="phone">Утасны дугаар</Label><Input id="phone" inputMode="tel" autoComplete="tel" required placeholder="9911 2233" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-          <div><Label htmlFor="password">Шинэ нууц үг</Label><PasswordInput id="password" autoComplete="off" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-          <div><Label htmlFor="confirm">Шинэ нууц үг давтан</Label><PasswordInput id="confirm" autoComplete="off" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></div>
+          <div><Label htmlFor="password">Шинэ нууц үг</Label><PinInput id="password" autoComplete="off" required value={password} onValue={setPassword} /></div>
+          <div><Label htmlFor="confirm">Шинэ нууц үг давтан</Label><PinInput id="confirm" autoComplete="off" required value={confirmPassword} onValue={setConfirmPassword} /></div>
           {error && <Notice tone="danger">{error}</Notice>}
           <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Солиж байна…' : 'Нууц үг солих'}</Button>
           <p className="text-sm text-muted-foreground"><Link href="/login" className="text-primary hover:underline">Нэвтрэх рүү буцах</Link></p>

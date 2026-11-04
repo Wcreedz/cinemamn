@@ -16,7 +16,7 @@ import { badRequest, conflict, forbidden, notFound } from '../utils/errors';
 import { escapeRegex, objectId, paged, pageQuery, parse, sortFrom } from '../utils/http';
 import { normalizePhone } from '../utils/phone';
 import { toSlug } from '../utils/slug';
-import { adminCreateSchema, adminRoleSchema, categoryInput, extendSchema, movieInput, refundSchema, userPasswordSchema, userStatusSchema } from '../validators';
+import { adminCreateSchema, adminRoleSchema, categoryInput, extendSchema, movieInput, newPasswordFieldFor, refundSchema, userPasswordSchema, userStatusSchema } from '../validators';
 import { movieDetail } from './movie.controller';
 
 const idParam = (req: Request, name = 'id') => new Types.ObjectId(parse(objectId, req.params[name]));
@@ -95,6 +95,7 @@ export async function setUserPassword(req: Request, res: Response) {
   const target = await User.findById(id);
   if (!target) throw notFound('Хэрэглэгч олдсонгүй.');
   if (target.role !== 'user' && req.user!.role !== 'superadmin') throw forbidden('Админы нууц үгийг зөвхөн Superadmin шинэчилнэ.');
+  parse(newPasswordFieldFor(target.role), password);
   target.passwordHash = await hashPassword(password);
   target.failedLoginAttempts = 0;
   target.lockUntil = undefined;

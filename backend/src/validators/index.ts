@@ -3,14 +3,17 @@ import { objectId } from '../utils/http';
 
 const PHONE_ERROR = 'Утасны дугаар буруу байна. 8 оронтой Монгол дугаар оруулна уу.';
 export const phoneField = z.string({ error: 'Утасны дугаараа оруулна уу.' }).trim().min(8, PHONE_ERROR).max(20, PHONE_ERROR);
-// Урт, бүтцийн шаардлага тавихгүй. Дээд хязгаар нь хэт урт утгаар hash-ийг ачааллуулахаас сэргийлнэ.
+// Админы нууц үг. Дээд хязгаар нь хэт урт утгаар hash-ийг ачааллуулахаас сэргийлнэ.
 export const passwordField = z.string({ error: 'Нууц үгээ оруулна уу.' }).min(1, 'Нууц үгээ оруулна уу.').max(128, 'Нууц үг хэт урт байна.');
+// Энгийн хэрэглэгчийн шинэ нууц үг. Нэвтрэх схем үүнийг шаарддаггүй тул өмнөх нууц үгтэй хэрэглэгч нэвтэрсээр байна.
+export const pinField = z.string({ error: 'Нууц үгээ оруулна уу.' }).min(1, 'Нууц үгээ оруулна уу.').regex(/^[0-9]{4}$/, 'Нууц үг 4 оронтой тоо байх ёстой.');
+export const newPasswordFieldFor = (role: string) => (role === 'user' ? pinField : passwordField);
 
-export const registerSchema = z.object({ phone: phoneField, password: passwordField, name: z.string().trim().max(80).default('') });
+export const registerSchema = z.object({ phone: phoneField, password: pinField, name: z.string().trim().max(80).default('') });
 export const loginSchema = z.object({ phone: phoneField, password: z.string().min(1).max(128) });
 export const emailField = z.string().trim().toLowerCase().max(254).email('Имэйл хаяг буруу байна');
 export const adminLoginSchema = z.object({ email: emailField, password: z.string().min(1).max(128), remember: z.boolean().default(false) });
-export const resetPasswordSchema = z.object({ phone: phoneField, password: passwordField, confirmPassword: z.string() })
+export const resetPasswordSchema = z.object({ phone: phoneField, password: pinField, confirmPassword: z.string() })
   .refine((v) => v.password === v.confirmPassword, { path: ['confirmPassword'], message: 'Нууц үг таарахгүй байна.' });
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: passwordField });
 export const profileSchema = z.object({ name: z.string().trim().max(80) });

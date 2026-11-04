@@ -156,9 +156,10 @@ describe('Админ удирдлага', () => {
     await User.updateOne({ _id: t.user._id }, { $set: { lockUntil: new Date(Date.now() + 1e7) } });
     expect((await t.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'Other-pass-123' })).status).toBe(403);
     expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: '' })).status).toBe(400);
-    expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'Fresh-pass-123' })).status).toBe(200);
+    expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: 'Fresh-pass-123' })).status).toBe(400);
+    expect((await admin.agent.patch(`/api/admin/users/${t.user._id}/password`).send({ password: '9090' })).status).toBe(200);
     expect((await api().post('/api/auth/login').send({ phone: t.phone, password: t.password })).status).toBe(401);
-    expect((await api().post('/api/auth/login').send({ phone: t.phone, password: 'Fresh-pass-123' })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ phone: t.phone, password: '9090' })).status).toBe(200);
     expect((await t.agent.post('/api/auth/refresh')).status).toBe(401);
     expect(await AdminLog.countDocuments({ action: 'user.password_reset' })).toBe(1);
     // Логт нууц үг бичигдэхгүй
