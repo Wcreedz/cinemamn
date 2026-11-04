@@ -202,19 +202,19 @@ export const VideoService = {
       if (await movieGone()) throw new Error('Кино устгагдсан.');
       const previous = await Movie.findById(movieId).select('+videoSource').lean();
       await fs.mkdir(dirs.hls, { recursive: true });
-      await fs.mkdir(dirs.originals, { recursive: true });
       const finalDir = path.join(dirs.hls, movieId);
       await fs.rm(finalDir, { recursive: true, force: true });
       await fs.rename(work, finalDir);
-      const original = path.join(dirs.originals, `${movieId}${path.extname(job.sourcePath)}`);
-      await fs.rename(job.sourcePath, original);
       await Movie.updateOne({ _id: movieId }, {
-        $set: { videoStatus: 'ready', hlsPath: `hls/${movieId}`, videoSource: original, duration: Math.round(info.duration), videoProcessSeconds: Math.round((Date.now() - startedAt) / 1000) },
-        $unset: { videoError: 1, videoProgress: 1 },
+        $set: { videoStatus: 'ready', hlsPath: `hls/${movieId}`, duration: Math.round(info.duration), videoProcessSeconds: Math.round((Date.now() - startedAt) / 1000) },
+        $unset: { videoError: 1, videoProgress: 1, videoSource: 1 },
       });
-      await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'ready', sourcePath: original, finishedAt: new Date() }, $unset: { error: 1 } });
-      // Өөр өргөтгөлтэй файлаар солиход хуучин эх файл өөрөө дарагдахгүй.
-      if (previous?.videoSource && previous.videoSource !== original) await fs.rm(previous.videoSource, { force: true });
+      await VideoJob.updateOne({ _id: job._id }, { $set: { status: 'ready', finishedAt: new Date() }, $unset: { error: 1 } });
+      // Тоглуулалт зөвхөн HLS-ийг ашигладаг тул эх файлыг хадгалахгүй. Кино бэлэн болсны дараа л устгана:
+      // өмнө нь устгавал тасалдсан ажлыг сэргээх файл үлдэхгүй. Устгаж чадаагүй нь киног алдаатай болгох ёсгүй.
+      await Promise.all([job.sourcePath, previous?.videoSource].filter((file): file is string => !!file).map((file) => (
+        fs.rm(file, { force: true }).catch((e) => console.error(`[video] эх файл устгаж чадсангүй ${file}:`, (e as Error).message))
+      )));
     } catch (err) {
       if (await movieGone()) {
         await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);

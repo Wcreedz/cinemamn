@@ -66,7 +66,7 @@ const movieSchema = new Schema({
   poster: String,
   backdrop: String,
   trailerUrl: String,
-  videoSource: { type: String, select: false }, // эх файлын зам: хэзээ ч гадагш гаргахгүй
+  videoSource: { type: String, select: false }, // эх файлыг хадгалдаг байсан үеийн зам: шинэ видео орох эсвэл кино устахад файлтай нь арилна
   hlsPath: { type: String, select: false },
   videoStatus: { type: String, enum: ['none', 'uploading', 'queued', 'processing', 'ready', 'failed'], default: 'none' },
   videoError: String,

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -119,8 +119,10 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     expect(Math.round(after!.duration!)).toBe(4);
     expect(after!.hlsPath).toBe(`hls/${movie._id}`);
     expect((await VideoJob.findById(up.body.jobId).lean())!.status).toBe('ready');
-    // Эх файл нийтэд гарахгүй originals/-д, түр хавтас цэвэрлэгдсэн
-    expect(after!.videoSource).toContain('originals');
+    // Эх файл хадгалагдахгүй, түр хавтас цэвэрлэгдсэн
+    expect(after!.videoSource).toBeUndefined();
+    await expect(fs.access(job.sourcePath)).rejects.toThrow();
+    await expect(fs.access(path.join(env.VIDEO_DEFAULT_ROOT, 'originals', `${movie._id}.mp4`))).rejects.toThrow();
     expect((await fs.readdir(path.join(env.VIDEO_DEFAULT_ROOT, 'temp'))).length).toBe(0);
 
     const viewer = await login();
@@ -149,7 +151,26 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     const after = await Movie.findById(movie._id).select('+videoSource +hlsPath').lean();
     expect(after!.videoStatus).toBe('ready');
     expect(Math.round(after!.duration!)).toBe(4);
-    expect(after!.videoSource).toMatch(/\.ts$/);
+    await fs.access(path.join(env.VIDEO_DEFAULT_ROOT, 'hls', String(movie._id), 'master.m3u8'));
+  });
+
+  it('эх файл устгаж чадаагүй ч кино бэлэн болж, үзэх боломжтой', async () => {
+    const movie = await makeMovie({ videoStatus: 'none' });
+    const admin = await login('admin');
+    await uploadVideo(admin.agent, movie._id, sample, 'kino.mp4');
+    const job = (await VideoService.claimNext())!;
+    const realRm = fs.rm.bind(fs);
+    const rm = vi.spyOn(fs, 'rm').mockImplementation((file, opts) => (file === job.sourcePath ? Promise.reject(new Error('EPERM')) : realRm(file, opts)));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await VideoService.process(job);
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('эх файл устгаж чадсангүй'), 'EPERM');
+    } finally {
+      rm.mockRestore();
+      log.mockRestore();
+    }
+    expect((await Movie.findById(movie._id).lean())!.videoStatus).toBe('ready');
+    expect((await VideoJob.findById(job._id).lean())!.status).toBe('ready');
     await fs.access(path.join(env.VIDEO_DEFAULT_ROOT, 'hls', String(movie._id), 'master.m3u8'));
   });
 
@@ -269,15 +290,19 @@ describe('Видео: байршуулалтаас тоглуулалт хүрт
     expect((await admin.agent.get(`/api/admin/movies/${movie._id}`)).body.videoStatus).toBe('failed');
     await watchable();
 
-    // Өөр өргөтгөлтэй шинэ файл амжилттай бол хуучин эх файл дискэнд үлдэхгүй.
-    const before = (await Movie.findById(movie._id).select('+videoSource').lean())!.videoSource!;
+    // Эх файл хадгалдаг байсан үеийн кино: шинэ файл амжилттай бол хуучин эх файл дискэнд үлдэхгүй.
+    const legacy = path.join(env.VIDEO_DEFAULT_ROOT, 'originals', `${movie._id}.mp4`);
+    await fs.mkdir(path.dirname(legacy), { recursive: true });
+    await fs.writeFile(legacy, 'хуучин эх файл');
+    await Movie.updateOne({ _id: movie._id }, { $set: { videoSource: legacy } });
     await uploadVideo(admin.agent, movie._id, sample, 'shine.mkv');
-    await VideoService.process((await VideoService.claimNext())!);
+    const replaced = (await VideoService.claimNext())!;
+    await VideoService.process(replaced);
     const after = (await Movie.findById(movie._id).select('+videoSource').lean())!;
     expect(after.videoStatus).toBe('ready');
-    expect(after.videoSource).toMatch(/\.mkv$/);
-    await fs.access(after.videoSource!);
-    await expect(fs.access(before)).rejects.toThrow();
+    expect(after.videoSource).toBeUndefined();
+    await expect(fs.access(legacy)).rejects.toThrow();
+    await expect(fs.access(replaced.sourcePath)).rejects.toThrow();
     await watchable();
   });
 

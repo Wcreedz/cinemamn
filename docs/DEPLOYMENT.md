@@ -26,7 +26,7 @@ sudo systemctl enable --now mongod
 Видео хадгалах хавтас:
 
 ```sh
-sudo mkdir -p /srv/mongolflix/{originals,hls,posters,backdrops,temp}
+sudo mkdir -p /srv/mongolflix/{hls,posters,backdrops,temp}
 sudo chown -R "$USER":www-data /srv/mongolflix
 sudo chmod -R 750 /srv/mongolflix
 ```

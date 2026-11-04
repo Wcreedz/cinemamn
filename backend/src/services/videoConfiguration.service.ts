@@ -17,7 +17,6 @@ export const VideoConfigurationService = {
   dirs(root: string) {
     return {
       root,
-      originals: path.join(root, 'originals'),
       hls: path.join(root, 'hls'),
       posters: path.join(root, 'posters'),
       backdrops: path.join(root, 'backdrops'),
