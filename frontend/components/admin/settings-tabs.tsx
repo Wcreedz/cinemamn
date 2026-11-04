@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { AdminMovie, Paginated, PublicUser } from '@mongolflix/shared';
-import { BACKDROP_MAX_SIDE, ImageField, uploadImageFile } from '@/components/admin/image-field';
+import { BACKDROP_MAX_SIDE, FAVICON_MAX_SIDE, ImageField, LOGO_MAX_SIDE, uploadImageFile } from '@/components/admin/image-field';
 import { Field, NumberInput, Panel, Table } from '@/components/admin/ui';
 import { useApp } from '@/components/providers';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ interface Entry<T> { value: T; version: number }
 export interface AllSettings {
   general: Entry<General>; subscription: Entry<Subscription>; video: Entry<Video>; security: Entry<Security>; homepage: Entry<Homepage>; videoAllowedRoots: string[];
 }
-interface General { siteName: string; logo: string; favicon: string; description: string; maintenanceMode: boolean }
+interface General { siteName: string; logo: string; favicon: string; description: string; maintenanceMode: boolean; logoFile?: File | null; faviconFile?: File | null }
 interface PlanRow { code: string; name: string; price: number; durationDays: number; enabled: boolean }
 interface Subscription { enabled: boolean; paymentRequired: boolean; currency: string; paymentExpiryMinutes: number; plans: PlanRow[] }
 interface Video { storageRoot: string; hlsResolutions: number[]; ffmpeg: { preset: string; crf: number; segmentSeconds: number; threads: number }; playbackTokenExpiryMinutes: number }
@@ -43,7 +43,8 @@ interface Banner { title: string; subtitle?: string; image?: string; link?: stri
 interface Ad { image: string; link?: string; enabled: boolean; file?: File | null }
 const MAX_BANNERS = 10;
 interface Section { key: string; title: string; type: 'new' | 'popular' | 'continue' | 'category'; categorySlug?: string; visible: boolean; order: number }
-interface Homepage { heroBanners: Banner[]; adBanners?: Ad[]; featuredMovieIds: string[]; sections: Section[] }
+interface CatalogBannerForm { image: string; mobileImage?: string; link?: string; enabled: boolean; file?: File | null; mobileFile?: File | null }
+interface Homepage { heroBanners: Banner[]; adBanners?: Ad[]; catalogBanner?: CatalogBannerForm; featuredMovieIds: string[]; sections: Section[] }
 
 function useSection<T>(entry: Entry<T>, path: string, reload: () => Promise<void>) {
   const [form, setForm] = useState(entry.value);
@@ -68,16 +69,24 @@ const Toggle = ({ label, hint, checked, onChange, disabled }: { label: string; h
   </label>
 );
 
+const withBrandImages = async ({ logoFile, faviconFile, ...general }: General) => ({
+  ...general,
+  logo: logoFile ? await uploadImageFile('/api/admin/banners/image', logoFile, LOGO_MAX_SIDE, 'image/png') : general.logo,
+  favicon: faviconFile ? await uploadImageFile('/api/admin/banners/image', faviconFile, FAVICON_MAX_SIDE, 'image/png') : general.favicon,
+});
+
 export function GeneralTab({ entry, reload }: { entry: Entry<General>; reload: () => Promise<void> }) {
   const { form: f, setForm, save, msg, busy } = useSection(entry, 'general', reload);
   return (
     <Panel className="max-w-2xl space-y-4">
       <Field label="Сайтын нэр" id="site"><Input id="site" value={f.siteName} onChange={(e) => setForm({ ...f, siteName: e.target.value })} /></Field>
-      <Field label="Лого URL" id="logo"><Input id="logo" value={f.logo} onChange={(e) => setForm({ ...f, logo: e.target.value })} /></Field>
-      <Field label="Favicon URL" id="fav"><Input id="fav" value={f.favicon} onChange={(e) => setForm({ ...f, favicon: e.target.value })} /></Field>
+      <div className="grid gap-4 md:grid-cols-2">
+        <ImageField label="Лого" hint="Сайтын дээд талд нэрийн оронд гарна. Тунгалаг дэвсгэртэй PNG тохиромжтой. Оруулаагүй бол сайтын нэр бичгээр харагдана." src={f.logo} file={f.logoFile ?? null} previewClass="h-12 w-auto max-w-full" onPick={(logoFile) => setForm({ ...f, logoFile })} onRemove={() => setForm({ ...f, logo: '', logoFile: null })} />
+        <ImageField label="Favicon (хөтчийн табын дүрс)" hint="Дөрвөлжин, 512×512 PNG тохиромжтой. Хадгалснаас хойш нэг минут хүртэл хугацааны дараа шинэчлэгдэнэ." src={f.favicon} file={f.faviconFile ?? null} previewClass="size-12" onPick={(faviconFile) => setForm({ ...f, faviconFile })} onRemove={() => setForm({ ...f, favicon: '', faviconFile: null })} />
+      </div>
       <Field label="Сайтын тайлбар" id="desc"><Textarea id="desc" value={f.description} onChange={(e) => setForm({ ...f, description: e.target.value })} /></Field>
       <Toggle label="Засварын горим" hint="Идэвхтэй үед энгийн хэрэглэгчид сайтыг ашиглах боломжгүй." checked={f.maintenanceMode} onChange={(v) => setForm({ ...f, maintenanceMode: v })} />
-      <SaveRow msg={msg} busy={busy} save={() => void save()} />
+      <SaveRow msg={msg} busy={busy} save={() => void save(withBrandImages)} />
     </Panel>
   );
 }
@@ -216,20 +225,43 @@ const withUploaded = <R extends { image?: string; file?: File | null }>(rows: R[
   (file ? { ...row, image: await uploadImageFile('/api/admin/banners/image', file, BACKDROP_MAX_SIDE) } : row) as R
 )));
 
+const uploadBanner = (file: File) => uploadImageFile('/api/admin/banners/image', file, BACKDROP_MAX_SIDE);
+const withCatalogImages = async ({ file, mobileFile, ...banner }: CatalogBannerForm) => ({
+  ...banner,
+  image: file ? await uploadBanner(file) : banner.image,
+  mobileImage: mobileFile ? await uploadBanner(mobileFile) : banner.mobileImage,
+});
+
 export function HomepageTab({ entry, reload }: { entry: Entry<Homepage>; reload: () => Promise<void> }) {
   const { form: f, setForm, save, msg, busy } = useSection(entry, 'homepage', reload);
   const movies = useApi<Paginated<AdminMovie>>('/api/admin/movies?limit=100&sort=title');
   const published = movies.data?.items.filter((m) => m.isPublished);
   const ads = f.adBanners ?? [];
+  const catalog = f.catalogBanner ?? { image: '', enabled: false };
+  const setCatalog = (p: Partial<CatalogBannerForm>) => setForm({ ...f, catalogBanner: { ...catalog, ...p } });
   const sections = [...f.sections].sort((a, b) => a.order - b.order);
   const dirty = JSON.stringify(f) !== JSON.stringify(entry.value);
   const setBanner = (i: number, p: Partial<Banner>) => setForm({ ...f, heroBanners: f.heroBanners.map((b, j) => (j === i ? { ...b, ...p } : b)) });
   const setAd = (i: number, p: Partial<Ad>) => setForm({ ...f, adBanners: ads.map((b, j) => (j === i ? { ...b, ...p } : b)) });
   const setSection = (key: string, p: Partial<Section>) => setForm({ ...f, sections: f.sections.map((s) => (s.key === key ? { ...s, ...p } : s)) });
   const move = (i: number, dir: number) => setForm({ ...f, sections: moved(sections, i, dir).map((x, order) => ({ ...x, order: order + 1 })) });
-  const submit = () => save(async (form) => ({ ...form, heroBanners: await withUploaded(form.heroBanners), adBanners: await withUploaded(form.adBanners ?? []) }));
+  const submit = () => save(async (form) => ({ ...form, heroBanners: await withUploaded(form.heroBanners), adBanners: await withUploaded(form.adBanners ?? []), catalogBanner: await withCatalogImages(form.catalogBanner ?? catalog) }));
   return (
     <div className="space-y-6">
+      <Panel className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-bold">Киноны жагсаалтын баннер</h2>
+            <p className="text-xs text-muted-foreground">Нүүр хуудасны &quot;Кино&quot; гарчгийн хажууд гарна. Зургаа солиод л шинэ баннер оруулна.</p>
+          </div>
+          <Switch aria-label="Баннер харуулах" checked={catalog.enabled} disabled={!catalog.image && !catalog.file} onCheckedChange={(enabled) => setCatalog({ enabled })} />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <ImageField label="Компьютерийн зураг" hint="Хамгийн тохиромжтой нь 1640×128. Дэлгэцийн өргөнөөс хамаарч хоёр тал нь таслагдаж болох тул гол бичгийг төвд байрлуулна уу." src={catalog.image} file={catalog.file ?? null} previewClass="h-16 w-full" onPick={(file) => setCatalog({ file, enabled: true })} onRemove={() => setCatalog({ image: '', file: null, enabled: false })} />
+          <ImageField label="Утасны зураг" hint="Хамгийн тохиромжтой нь 800×200. Заавал биш, гэхдээ оруулаагүй бол утсанд компьютерийн зураг маш нарийн харагдана." src={catalog.mobileImage ?? ''} file={catalog.mobileFile ?? null} previewClass="h-20 w-full" onPick={(mobileFile) => setCatalog({ mobileFile })} onRemove={() => setCatalog({ mobileImage: '', mobileFile: null })} />
+        </div>
+        <Field label="Дарахад очих хаяг" hint="Заавал биш. /-ээр эхэлбэл сайт дотор, https://-ээр эхэлбэл шинэ цонхонд нээгдэнэ."><Input placeholder="/movies/… эсвэл https://…" value={catalog.link ?? ''} onChange={(e) => setCatalog({ link: e.target.value })} /></Field>
+      </Panel>
       <Panel className="space-y-4">
         <div>
           <h2 className="font-bold">Нүүрний слайд</h2>

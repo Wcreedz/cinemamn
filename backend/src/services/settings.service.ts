@@ -22,7 +22,7 @@ export const defaults = (): SettingValues => ({
   },
   security: { sessionExpiryDays: 30, loginMaxAttempts: 5, loginLockMinutes: 15, allowedAdminIps: [] },
   homepage: {
-    heroBanners: [], adBanners: [], featuredMovieIds: [],
+    heroBanners: [], adBanners: [], catalogBanner: { image: '', enabled: false }, featuredMovieIds: [],
     sections: [
       section('new', 'Шинээр нэмэгдсэн', 'new', 1),
       section('mongol', 'Монгол кино', 'category', 2, 'mongol'),
@@ -81,7 +81,7 @@ export const SettingsService = {
     // Энд зөвхөн нийтэд ил байж болох талбаруудыг нэг бүрчлэн сонгоно.
     return {
       general: { siteName: general.siteName, logo: general.logo, favicon: general.favicon, description: general.description, maintenanceMode: general.maintenanceMode },
-      homepage: { heroBanners: homepage.heroBanners.filter((b) => b.enabled), adBanners: homepage.adBanners.filter((b) => b.enabled), featuredMovieIds: homepage.featuredMovieIds, sections: homepage.sections },
+      homepage: { heroBanners: homepage.heroBanners.filter((b) => b.enabled), adBanners: homepage.adBanners.filter((b) => b.enabled), catalogBanner: homepage.catalogBanner.enabled ? { image: homepage.catalogBanner.image, mobileImage: homepage.catalogBanner.mobileImage, link: homepage.catalogBanner.link } : null, featuredMovieIds: homepage.featuredMovieIds, sections: homepage.sections },
       subscription: { enabled: subscription.enabled, paymentRequired: subscription.paymentRequired, currency: subscription.currency },
     };
   },

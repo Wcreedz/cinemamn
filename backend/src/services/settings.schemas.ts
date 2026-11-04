@@ -62,6 +62,12 @@ export const homepageSchema = z.object({
     link: url.optional(),
     enabled: z.boolean(),
   })).max(10).default([]),
+  catalogBanner: z.object({
+    image: url,
+    mobileImage: url.optional(),
+    link: url.optional(),
+    enabled: z.boolean(),
+  }).refine((b) => !b.enabled || b.image, { path: ['image'], message: 'Баннерын зураг оруулна уу' }).default({ image: '', enabled: false }),
   featuredMovieIds: z.array(z.string().regex(/^[a-f0-9]{24}$/i)).max(20),
   sections: z.array(z.object({
     key: z.string().regex(/^[a-z0-9-]+$/),

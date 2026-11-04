@@ -8,12 +8,14 @@ import { compressImage } from '@/lib/compress-image';
 
 export const POSTER_MAX_SIDE = 1200;
 export const BACKDROP_MAX_SIDE = 1920;
+export const LOGO_MAX_SIDE = 800;
+export const FAVICON_MAX_SIDE = 512;
 
 export const fileSize = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`);
 
-export async function uploadImageFile(url: string, file: File, maxSide: number) {
+export async function uploadImageFile(url: string, file: File, maxSide: number, type?: 'image/jpeg' | 'image/png') {
   const form = new FormData();
-  form.append('image', await compressImage(file, maxSide));
+  form.append('image', await compressImage(file, maxSide, type));
   return (await api<{ url: string }>(url, { form })).url;
 }
 

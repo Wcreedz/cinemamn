@@ -43,10 +43,11 @@ export interface PaymentView {
 
 export interface HeroBanner { title: string; subtitle?: string; image?: string; link?: string; enabled: boolean }
 export interface AdBanner { image: string; link?: string; enabled: boolean }
+export interface CatalogBanner { image: string; mobileImage?: string; link?: string }
 export interface HomeSection { key: string; title: string; type: 'new' | 'popular' | 'continue' | 'category'; categorySlug?: string; visible: boolean; order: number }
 export interface PublicSettings {
   general: { siteName: string; logo?: string; favicon?: string; description: string; maintenanceMode: boolean };
-  homepage: { heroBanners: HeroBanner[]; adBanners: AdBanner[]; featuredMovieIds: string[]; sections: HomeSection[] };
+  homepage: { heroBanners: HeroBanner[]; adBanners: AdBanner[]; catalogBanner?: CatalogBanner | null; featuredMovieIds: string[]; sections: HomeSection[] };
   subscription: { enabled: boolean; paymentRequired: boolean; currency: string };
 }
 

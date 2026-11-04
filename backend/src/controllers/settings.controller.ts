@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { AdminLog } from '../models';
 import { logAdmin } from '../services/adminLog.service';
 import { MediaService } from '../services/media.service';
-import { HomepageSettings, SettingKey, VideoSettings } from '../services/settings.schemas';
+import { GeneralSettings, HomepageSettings, SettingKey, VideoSettings } from '../services/settings.schemas';
 import { SettingsService } from '../services/settings.service';
 import { VideoConfigurationService } from '../services/videoConfiguration.service';
 import { env } from '../config/env';
@@ -31,8 +31,12 @@ async function applyUpdate(req: Request, res: Response, key: SettingKey) {
   }
   const r = await SettingsService.update(key, value, req.user!._id, expectedVersion);
   await logAdmin(req, `settings.${key}.update`, { type: 'SystemSetting' }, { before: r.before.value, after: r.after.value, version: r.after.version });
+  if (key === 'general') {
+    const images = (general: GeneralSettings) => [general.logo, general.favicon];
+    await MediaService.removeUnused(images(r.before.value as GeneralSettings), images(r.after.value as GeneralSettings));
+  }
   if (key === 'homepage') {
-    const images = (home: HomepageSettings) => [...home.heroBanners, ...home.adBanners].map((b) => b.image);
+    const images = (home: HomepageSettings) => [...home.heroBanners, ...home.adBanners].map((b) => b.image).concat(home.catalogBanner.image, home.catalogBanner.mobileImage);
     await MediaService.removeUnused(images(r.before.value as HomepageSettings), images(r.after.value as HomepageSettings));
   }
   res.json(r.after);

@@ -2,7 +2,9 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Category, MovieSummary, Paginated } from '@mongolflix/shared';
+import { CatalogBanner } from '@/components/catalog-banner';
 import { MovieGrid, MovieGridSkeleton } from '@/components/movie-card';
+import { useApp } from '@/components/providers';
 import { Select } from '@/components/ui/input';
 import { EmptyState, ErrorState } from '@/components/ui/misc';
 import { Pagination } from '@/components/ui/pagination';
@@ -12,6 +14,7 @@ import { usePagination } from '@/hooks/use-pagination';
 function Catalog() {
   const params = useSearchParams();
   const router = useRouter();
+  const banner = useApp().settings?.homepage.catalogBanner;
   const category = params.get('category') ?? '';
   const [sort, setSort] = useState('new');
   const pager = usePagination();
@@ -22,6 +25,7 @@ function Catalog() {
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-black">Кино</h1>
+        {banner && <CatalogBanner banner={banner} />}
         <Select aria-label="Ангилал" className="w-auto" value={category} onChange={(e) => { setPage(1); router.push(e.target.value ? `/?category=${e.target.value}` : '/'); }}>
           <option value="">Бүх ангилал</option>
           {cats.data?.items.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}
