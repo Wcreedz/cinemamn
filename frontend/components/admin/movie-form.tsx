@@ -17,7 +17,9 @@ import { api, ApiClientError } from '@/lib/api';
 const VIDEO_LABELS: Record<string, string> = { none: 'Видеогүй', uploading: 'Оруулж байна', queued: 'Дараалалд', processing: 'Боловсруулж байна', ready: 'Бэлэн', failed: 'Алдаатай' };
 // Vercel-ээр дамжих зам тасалдаж болно: нэг хэсэг бүтэлгүйтвэл хүлээгээд давтана.
 const CHUNK_SENDERS = 4;
-const CHUNK_ATTEMPTS = 8;
+// Оролдлогын тоогоор биш хугацаагаар хязгаарлана: API-г дахин эхлүүлэх (deploy), Vercel эсвэл
+// сүлжээний богино тасалдал энэ хугацаанд багтаж, байршуулалт өөрөө үргэлжилнэ.
+const RETRY_WINDOW_MS = 10 * 60_000;
 const MAX_BACKOFF_MS = 30_000;
 
 // Хуучин хувилбар хадгалсан англи бичиг: хэмжээний хязгаар одоо байхгүй.
@@ -68,17 +70,32 @@ const chunkBytes = (index: number, chunkSize: number, size: number) => Math.min(
 const PERMANENT_CODES = new Set(['DISK_FULL', 'FFMPEG_MISSING']);
 const isTemporary = (err: unknown) => err instanceof ApiClientError && !PERMANENT_CODES.has(err.code) && (err.status === 0 || err.status >= 500 || err.status === 429 || err.status === 408);
 
-interface RetryHooks { stopped: () => boolean; onRetry: (attempt: number) => void }
+interface RetryHooks { stopped: () => boolean; onRetry: (info: { offline: boolean; secondsLeft: number }) => void }
+
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
+// Хүлээх хугацаа дуусах эсвэл интернэт эргэж холбогдох хүртэл хүлээнэ: холболт сэргэмэгц шууд үргэлжилнэ.
+function pause(ms: number) {
+  return new Promise<void>((resolve) => {
+    const done = () => { clearTimeout(timer); window.removeEventListener('online', done); resolve(); };
+    const timer = setTimeout(done, ms);
+    window.addEventListener('online', done);
+  });
+}
 
 async function withRetry<T>(request: () => Promise<T>, { stopped, onRetry }: RetryHooks): Promise<T> {
+  const deadline = Date.now() + RETRY_WINDOW_MS;
   for (let attempt = 1; ; attempt++) {
     try {
       return await request();
     } catch (err) {
       if (!isTemporary(err) || stopped()) throw err;
-      if (attempt >= CHUNK_ATTEMPTS) throw new Error('Холболт удаан тасарсан тул байршуулалт зогслоо. Өмнө орсон хэсгүүд хадгалагдсан: холболтоо шалгаад товчийг дахин дарвал тасарсан газраасаа үргэлжилнэ.');
-      onRetry(attempt);
-      await new Promise((r) => setTimeout(r, Math.min(MAX_BACKOFF_MS, 1000 * 2 ** (attempt - 1))));
+      const offline = isOffline();
+      if (Date.now() >= deadline) {
+        throw new Error(`${offline ? 'Интернэт холболт 10 минутаас удаан тасарсан' : 'Сервер 10 минутын турш хариу өгсөнгүй'} тул байршуулалт зогслоо (${(err as Error).message}). Өмнө орсон хэсгүүд хадгалагдсан: ижил файлаа сонгоод дахин "Хадгалах" дарвал тасарсан газраасаа үргэлжилнэ.`);
+      }
+      onRetry({ offline, secondsLeft: Math.ceil((deadline - Date.now()) / 1000) });
+      await pause(Math.min(MAX_BACKOFF_MS, 1000 * 2 ** (attempt - 1), Math.max(0, deadline - Date.now())));
     }
   }
 }
@@ -182,7 +199,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     let failed = false;
     const hooks: RetryHooks = {
       stopped: () => failed,
-      onRetry: (attempt) => setTask((t) => t && { ...t, warning: `Сервер түр хариу өгсөнгүй. Автоматаар дахин оролдож байна (${attempt}/${CHUNK_ATTEMPTS - 1}), хуудсаа хаах хэрэггүй.` }),
+      onRetry: ({ offline, secondsLeft }) => setTask((t) => t && { ...t, warning: `${offline ? 'Интернэт тасарсан байна. Холболт сэргэмэгц' : 'Сервер түр хариу өгсөнгүй.'} автоматаар үргэлжилнэ (дахиад ~${Math.ceil(secondsLeft / 60)} мин оролдоно). Хуудсаа хаах хэрэггүй.` }),
     };
     const sender = async () => {
       for (let index = queue.shift(); index !== undefined && !failed; index = queue.shift()) {
