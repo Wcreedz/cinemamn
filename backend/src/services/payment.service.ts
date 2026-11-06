@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { IPayment, Payment, Subscription } from '../models';
 import { AppError, conflict, notFound } from '../utils/errors';
 import { CheckResult, QPayGateway } from './qpay.gateway';
+import { SettingsService } from './settings.service';
 import { paymentPrice, SubscriptionPricingService } from './subscriptionPricing.service';
 import { SubscriptionService } from './subscription.service';
 
@@ -45,6 +46,7 @@ export const PaymentService = {
     }).sort({ createdAt: -1 });
     if (existing) return existing;
 
+    const { siteName } = await SettingsService.get('general');
     const payment = await Payment.create({
       userId, orderNumber: newOrderNumber(), amount: quote.amount, fee: quote.fee, currency: quote.currency,
       planCode: quote.planCode, planName: quote.planName, durationDays: quote.durationDays, pricingVersion: quote.pricingVersion,
@@ -56,7 +58,7 @@ export const PaymentService = {
       const invoice = await QPayGateway.createInvoice(ref, {
         amount: payment.amount,
         orderNumber: payment.orderNumber,
-        description: `MongolFlix ${payment.planName} ${payment.orderNumber}`,
+        description: `${siteName} ${payment.planName} ${payment.orderNumber}`,
       });
       payment.invoiceId = invoice.invoiceId;
       payment.qr = invoice.qr;

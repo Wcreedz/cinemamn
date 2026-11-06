@@ -60,6 +60,19 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
     expect(dashboard.recentPayments.find((p: { id: string }) => p.id === res.body.id).price).toBe(10000);
   });
 
+  it('гүйлгээний утга админы тохируулсан сайтын нэрийг авна', async () => {
+    await setup();
+    const first = await newPayment();
+    expect(qpay.invoices.get(first.doc.invoiceId!)!.description).toBe(`MongolFlix ${first.doc.planName} ${first.doc.orderNumber}`);
+
+    const admin = await login('admin');
+    const { body } = await admin.agent.get('/api/admin/settings');
+    expect((await admin.agent.put('/api/admin/settings/general').send({ value: { ...body.general.value, siteName: 'MONkino' } })).status).toBe(200);
+
+    const { doc } = await newPayment();
+    expect(qpay.invoices.get(doc.invoiceId!)!.description).toBe(`MONkino ${doc.planName} ${doc.orderNumber}`);
+  });
+
   it('багцын харилцагчийн бүтцээр нэхэмжлэх үүсгэж QR буцаана', async () => {
     await setup();
     const { res, doc } = await newPayment();

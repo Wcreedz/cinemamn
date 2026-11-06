@@ -1,15 +1,31 @@
+'use client';
+import { useSyncExternalStore } from 'react';
 import type { PaymentView } from '@mongolflix/shared';
 import { Building2, QrCode } from 'lucide-react';
-import { Card } from '@/components/ui/misc';
+import { Card, Notice } from '@/components/ui/misc';
+import { isAndroidUserAgent, isInAppBrowserUserAgent, toBankAppLink } from '@/lib/bank-deeplink';
+
+const noopSubscribe = () => () => undefined;
+// Сервер дээр UA мэдэгдэхгүй тул false; клиент дээр бодит утга (hydration зөрөхгүй).
+function useUserAgentFlag(test: (ua: string) => boolean) {
+  return useSyncExternalStore(noopSubscribe, () => test(navigator.userAgent), () => false);
+}
 
 // Жижиг дэлгэцэд банкны апп-ууд, том дэлгэцэд QR код.
 export function QPayOptions({ qr, amount }: { qr: NonNullable<PaymentView['qr']>; amount: string }) {
+  const isAndroid = useUserAgentFlag(isAndroidUserAgent);
+  const inAppBrowser = useUserAgentFlag(isInAppBrowserUserAgent);
   return (
     <>
       <Card className="block p-4 sm:hidden">
         <p className="text-center text-lg font-bold">{amount}</p>
+        {inAppBrowser && (
+          <Notice tone="warning" className="my-3">
+            Банкаа сонгоход <b>&quot;You&apos;re leaving our app&quot;</b> гэсэн цонх гарвал <b>CONTINUE</b> (Үргэлжлүүлэх) товчийг дарна уу. Банкны апп нээгдэнэ.
+          </Notice>
+        )}
         {qr.urls.map((item) => (
-          <a key={item.link} href={item.link} className="flex items-center justify-between gap-3 border-b p-2 last:border-b-0">
+          <a key={item.link} href={toBankAppLink(item.link, isAndroid)} className="flex items-center justify-between gap-3 border-b p-2 last:border-b-0">
             {item.logo ? <img src={item.logo} alt="" className="size-8 rounded-md" /> : <span className="size-8" />}
             <span className="flex-1 text-center font-bold">{item.description || item.name}</span>
             <span className="text-muted-foreground" aria-hidden>&gt;</span>

@@ -62,7 +62,7 @@ export async function makeMovie(over: Record<string, unknown> = {}) {
 }
 
 // QPay-н хариуг дууриах тест сервер. quickqpaypackv2 жинхэнэ кодоороо энэ серверийг дуудна.
-export interface FakeInvoice { id: string; amount: number; status: string; paidAmount?: number; currency?: string; callback: string; merchantId: string; auth: string | undefined }
+export interface FakeInvoice { id: string; amount: number; description?: string; status: string; paidAmount?: number; currency?: string; callback: string; merchantId: string; auth: string | undefined }
 export class FakeQPay {
   invoices = new Map<string, FakeInvoice>();
   authCalls = 0;
@@ -105,7 +105,7 @@ export class FakeQPay {
     }
     if (url.startsWith('/v2/invoice')) {
       const id = `inv-${this.invoices.size + 1}-${Date.now()}`;
-      this.invoices.set(id, { id, amount: body.amount, status: 'OPEN', callback: body.callback_url, merchantId: body.merchant_id, auth: req.headers.authorization });
+      this.invoices.set(id, { id, amount: body.amount, description: body.description, status: 'OPEN', callback: body.callback_url, merchantId: body.merchant_id, auth: req.headers.authorization });
       return this.send(res, 200, { id, invoice_status: 'OPEN', amount: body.amount, qr_image: 'QRIMG', qr_code: 'QRTXT', urls: [{ name: 'Khan', link: 'khanbank://q' }] });
     }
     if (url.startsWith('/v2/payment/check')) {
