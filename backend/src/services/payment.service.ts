@@ -28,8 +28,9 @@ function evaluate(p: IPayment, r: CheckResult): { outcome: 'paid' | 'pending' | 
 }
 
 export const PaymentService = {
-  async create(userId: Types.ObjectId, planCode: string) {
-    const quote = await SubscriptionPricingService.quote(planCode);
+  // movieId өгвөл зөвхөн тэр киноны эрх, үгүй бол planCode-той бүх киноны эрхийн багц.
+  async create(userId: Types.ObjectId, target: { planCode: string; movieId?: string }) {
+    const quote = target.movieId ? await SubscriptionPricingService.quoteMovie(target.movieId) : await SubscriptionPricingService.quote(target.planCode);
     QPayGateway.assertConfigured();
     const ref = QPayGateway.ref();
     // quickqpaypackv2 нэхэмжлэхийг үргэлж MNT-ээр үүсгэдэг.
@@ -40,7 +41,7 @@ export const PaymentService = {
 
     // Ижил нөхцөлтэй хүчинтэй нэхэмжлэх байвал шинээр үүсгэлгүй түүнийг буцаана.
     const existing = await Payment.findOne({
-      userId, status: 'pending', planCode, amount: quote.amount, currency: quote.currency,
+      userId, status: 'pending', planCode: quote.planCode, movieId: quote.movieId ?? null, amount: quote.amount, currency: quote.currency,
       durationDays: quote.durationDays, qpayBaiguullagiinId: ref.baiguullagiinId, qpayBarilgiinId: ref.barilgiinId,
       invoiceId: { $type: 'string' }, expiresAt: { $gt: now },
     }).sort({ createdAt: -1 });
@@ -50,6 +51,7 @@ export const PaymentService = {
     const payment = await Payment.create({
       userId, orderNumber: newOrderNumber(), amount: quote.amount, fee: quote.fee, currency: quote.currency,
       planCode: quote.planCode, planName: quote.planName, durationDays: quote.durationDays, pricingVersion: quote.pricingVersion,
+      ...(quote.movieId ? { movieId: quote.movieId } : {}),
       qpayBaiguullagiinId: ref.baiguullagiinId, qpayBarilgiinId: ref.barilgiinId, status: 'pending',
       expiresAt: new Date(now.getTime() + quote.expiryMinutes * 60_000),
     });
@@ -178,7 +180,7 @@ export const PaymentService = {
   view(p: IPayment) {
     const open = p.status === 'pending';
     return {
-      id: String(p._id), orderNumber: p.orderNumber, planCode: p.planCode, planName: p.planName, amount: p.amount, fee: p.fee, price: paymentPrice(p), currency: p.currency,
+      id: String(p._id), orderNumber: p.orderNumber, planCode: p.planCode, planName: p.planName, movieId: p.movieId ? String(p.movieId) : undefined, amount: p.amount, fee: p.fee, price: paymentPrice(p), currency: p.currency,
       status: p.status, failureReason: p.failureReason, paidAt: p.paidAt, createdAt: p.createdAt, expiresAt: p.expiresAt,
       ...(open && p.qr ? { qr: { image: p.qr.image, text: p.qr.text, shortUrl: p.qr.shortUrl, urls: p.qr.urls ?? [] } } : {}),
     };

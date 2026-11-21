@@ -1,3 +1,4 @@
+import { expect, vi } from 'vitest';
 import http from 'http';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -140,3 +141,10 @@ export async function seedMerchant() {
   });
 }
 
+
+// quickqpaypackv2 нэхэмжлэх амжилттай үүссэний дараа QuickQpayObject-ийг await хийлгүй хадгалдаг.
+// Тест дуусахад тэр бичилт бааз хаагдах/цэвэрлэгдэхтэй уралдахгүйн тулд тест сервер дээр үүссэн нэхэмжлэх бүрийн бичлэгийг хүлээнэ.
+export async function settleQPayWrites(qpay: FakeQPay) {
+  const expected = qpay.invoices.size;
+  await vi.waitFor(async () => expect(await mongoose.connection.db.collection('QuickQpayObject').countDocuments()).toBeGreaterThanOrEqual(expected), { timeout: 8_000, interval: 50 });
+}

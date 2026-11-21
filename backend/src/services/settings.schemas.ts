@@ -12,7 +12,9 @@ export const generalSchema = z.object({
 });
 
 export const planSchema = z.object({
-  code: z.string().trim().regex(/^[A-Z0-9_]{2,20}$/, 'Кодод латин том үсэг, тоо, _ ашиглана'),
+  code: z.string().trim().regex(/^[A-Z0-9_]{2,20}$/, 'Кодод латин том үсэг, тоо, _ ашиглана')
+    // Нэг киноны эрх, админы гараар сунгасан эрхэд системд хэрэглэдэг код.
+    .refine((v) => v !== 'MOVIE' && v !== 'MANUAL', 'MOVIE, MANUAL кодыг систем ашигладаг'),
   name: z.string().trim().min(1).max(60),
   price: z.number().int('Үнэ бүхэл тоо байх ёстой').positive('Үнэ 0-ээс их байх ёстой'),
   durationDays: z.number().int().min(1).max(3660),

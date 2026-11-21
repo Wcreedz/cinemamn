@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AdminLog, Payment, Subscription } from '../src/models';
 import { BAIGUULLAGIIN_ID } from '../src/services/qpay.gateway';
-import { api, FakeQPay, login, resetDb, seedMerchant, startDb, stopDb } from './helpers';
+import { api, FakeQPay, login, resetDb, seedMerchant, settleQPayWrites, startDb, stopDb } from './helpers';
 
 const qpay = new FakeQPay();
 const monthly = (price: number) => ({
@@ -12,6 +12,7 @@ describe('Админ тохиргоо', () => {
   beforeAll(async () => { await startDb(); await qpay.start(); });
   afterAll(async () => { await qpay.stop(); await stopDb(); });
   beforeEach(async () => { await resetDb(); qpay.reset(); });
+  afterEach(() => settleQPayWrites(qpay));
 
   it('үнэ 14,900 -> 19,900: шинэ нэхэмжлэх шинэ үнэтэй, хуучин нь болон эрх өөрчлөгдөхгүй', async () => {
     await seedMerchant();

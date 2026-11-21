@@ -23,6 +23,8 @@ export const movieSummary = (m: any) => ({
 export const movieDetail = (m: any) => ({
   ...movieSummary(m), originalTitle: m.originalTitle, trailerUrl: m.trailerUrl, cast: m.cast ?? [], director: m.director,
   language: m.language, country: m.country, videoStatus: m.videoStatus,
+  // Шимтгэлгүй үндсэн үнэ. Тусад нь зарагдахгүй кинонд байхгүй.
+  ...(m.rentalPrice > 0 ? { rentalPrice: m.rentalPrice, rentalDays: m.rentalDays ?? 30 } : {}),
 });
 
 const SORTS = { new: { createdAt: -1 }, popular: { viewCount: -1 }, title: { title: 1 } } as const;

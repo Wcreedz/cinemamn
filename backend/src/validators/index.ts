@@ -37,6 +37,9 @@ export const movieInput = z.object({
   country: z.string().trim().max(60).optional(),
   isPublished: z.boolean().default(false),
   featured: z.boolean().default(false),
+  // Заагаагүй бол хуучин утга хэвээр. 0 бол зөвхөн бүх киноны эрхээр үзнэ.
+  rentalPrice: z.number().int('Үнэ бүхэл тоо байх ёстой').min(0, 'Үнэ сөрөг байж болохгүй').max(10_000_000).optional(),
+  rentalDays: z.number().int('Хоног бүхэл тоо байх ёстой').min(1, 'Дор хаяж 1 хоног').max(365, 'Дээд тал нь 365 хоног').optional(),
 });
 export const categoryInput = z.object({
   name: z.string().trim().min(1).max(60),
@@ -54,7 +57,8 @@ export const movieQuery = z.object({
   year: z.coerce.number().int().optional(),
   sort: z.enum(['new', 'popular', 'title']).default('new'),
 });
-export const createPaymentSchema = z.object({ planCode: z.string().regex(/^[A-Z0-9_]{2,20}$/).default('MONTHLY') });
+// movieId өгвөл зөвхөн тэр киноны эрх, planCode-ийг тоохгүй.
+export const createPaymentSchema = z.object({ planCode: z.string().regex(/^[A-Z0-9_]{2,20}$/).default('MONTHLY'), movieId: objectId.optional() });
 export const watchProgressSchema = z.object({ progressSeconds: z.number().min(0), durationSeconds: z.number().min(0), completed: z.boolean().optional() });
 export const extendSchema = z.object({ days: z.number().int().min(1).max(3660), note: z.string().trim().min(1, 'Шалтгаан бичнэ үү').max(500) });
 export const refundSchema = z.object({ note: z.string().trim().min(1, 'Шалтгаан бичнэ үү').max(500) });

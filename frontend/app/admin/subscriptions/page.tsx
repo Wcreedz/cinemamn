@@ -28,7 +28,7 @@ export default function AdminSubscriptions() {
             {data?.items.map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3"><Link href={`/admin/users/${s.userId}`} className="font-semibold text-primary hover:underline">{s.phone}</Link></td>
-                <td className="px-4 py-3">{s.planCode}</td><td className="px-4 py-3">{money(s.amount, s.currency)}</td>
+                <td className="px-4 py-3">{s.movieId ? `Кино: ${s.movieTitle ?? 'устгагдсан'}` : s.planCode}</td><td className="px-4 py-3">{money(s.amount, s.currency)}</td>
                 <td className="px-4 py-3"><Badge tone={s.status === 'active' ? 'success' : 'neutral'}>{s.status}</Badge></td>
                 <td className="px-4 py-3">{date(s.startedAt)}</td><td className="px-4 py-3">{date(s.expiresAt)}</td><td className="px-4 py-3 text-xs">{s.note}</td>
               </tr>

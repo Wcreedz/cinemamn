@@ -22,13 +22,17 @@ import { movieDetail } from './movie.controller';
 
 const idParam = (req: Request, name = 'id') => new Types.ObjectId(parse(objectId, req.params[name]));
 
+// movieId populate хийгдсэн: id-г нь хэвээр, нэрийг нь тусад нь буцаана.
+const adminSubscription = (s: any) => ({ ...SubscriptionService.view({ ...s, movieId: s.movieId?._id ?? s.movieId } as ISubscription), movieTitle: s.movieId?.title });
+
 export async function dashboard(_req: Request, res: Response) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const [totalUsers, activeIds, everSubscribed, totalPayments, revenue, recent, topMovies, video, visitors] = await Promise.all([
     User.countDocuments(),
-    Subscription.distinct('userId', { status: 'active', startedAt: { $lte: now }, expiresAt: { $gt: now } }),
-    Subscription.distinct('userId'),
+    // Захиалагч: бүх киноны эрхтэй хүн. Зөвхөн нэг кино худалдаж авсан хүнийг тоолохгүй.
+    Subscription.distinct('userId', { movieId: null, status: 'active', startedAt: { $lte: now }, expiresAt: { $gt: now } }),
+    Subscription.distinct('userId', { movieId: null }),
     Payment.countDocuments({ status: 'paid' }),
     Payment.aggregate([{ $match: { status: 'paid', paidAt: { $gte: monthStart } } }, { $group: { _id: '$currency', total: { $sum: { $subtract: ['$amount', { $ifNull: ['$fee', 0] }] } }, count: { $sum: 1 } } }]),
     Payment.find().sort({ createdAt: -1 }).limit(10).populate('userId', 'phone').lean(),
@@ -63,14 +67,14 @@ export async function getUser(req: Request, res: Response) {
   const user = await User.findById(id).lean();
   if (!user) throw notFound('Хэрэглэгч олдсонгүй.');
   const [subs, payments, watch] = await Promise.all([
-    Subscription.find({ userId: id }).sort({ createdAt: -1 }).limit(50).lean<ISubscription[]>(),
+    Subscription.find({ userId: id }).sort({ createdAt: -1 }).limit(50).populate('movieId', 'title').lean(),
     Payment.find({ userId: id }).sort({ createdAt: -1 }).limit(50).lean<IPayment[]>(),
     WatchHistory.find({ userId: id }).sort({ lastWatchedAt: -1 }).limit(50).populate('movieId', 'title slug').lean(),
   ]);
   const st = await SubscriptionService.status(id);
   res.json({
     user: AuthService.view(user), expiresAt: st.expiresAt, hasActive: !!st.current,
-    subscriptions: subs.map(SubscriptionService.view), payments: payments.map(PaymentService.view),
+    subscriptions: subs.map(adminSubscription), payments: payments.map(PaymentService.view),
     watchHistory: watch.map((w: any) => ({ title: w.movieId?.title, slug: w.movieId?.slug, progressSeconds: w.progressSeconds, durationSeconds: w.durationSeconds, completed: w.completed, lastWatchedAt: w.lastWatchedAt })),
   });
 }
@@ -149,7 +153,7 @@ export async function setAdminRole(req: Request, res: Response) {
 }
 
 // ---------- Кино ----------
-const adminMovie = (m: any) => ({ ...movieDetail(m), videoPlayable: !!m.hlsPath, isPublished: m.isPublished, videoError: m.videoError, videoProgress: m.videoProgress, videoUploadSeconds: m.videoUploadSeconds, videoProcessSeconds: m.videoProcessSeconds, createdAt: m.createdAt, updatedAt: m.updatedAt });
+const adminMovie = (m: any) => ({ ...movieDetail(m), rentalPrice: m.rentalPrice ?? 0, rentalDays: m.rentalDays ?? 30, videoPlayable: !!m.hlsPath, isPublished: m.isPublished, videoError: m.videoError, videoProgress: m.videoProgress, videoUploadSeconds: m.videoUploadSeconds, videoProcessSeconds: m.videoProcessSeconds, createdAt: m.createdAt, updatedAt: m.updatedAt });
 
 // Файлтай кинонд хуучин нээлттэй цонхны үлдэгдэл байршуулалт нөлөөлөхгүй.
 async function withUploadProgress(movies: any[]) {
@@ -216,7 +220,7 @@ export async function updateMovie(req: Request, res: Response) {
   const m = await Movie.findByIdAndUpdate(id, withoutEmpty(b, ['poster', 'backdrop']), { new: true, runValidators: true }).select('+hlsPath').populate('genres').lean();
   if (!m) throw notFound('Кино олдсонгүй.');
   await MediaService.removeUnused([before?.poster, before?.backdrop], [m.poster, m.backdrop]);
-  await logAdmin(req, 'movie.update', { type: 'Movie', id }, { title: m.title, isPublished: m.isPublished, featured: m.featured });
+  await logAdmin(req, 'movie.update', { type: 'Movie', id }, { title: m.title, isPublished: m.isPublished, featured: m.featured, rentalPrice: m.rentalPrice, rentalDays: m.rentalDays });
   res.json(adminMovie(m));
 }
 
@@ -362,10 +366,10 @@ export async function listSubscriptions(req: Request, res: Response) {
   const q = parse(pageQuery.extend({ status: z.enum(['pending', 'active', 'expired', 'cancelled']).optional() }), req.query);
   const filter = q.status ? { status: q.status } : {};
   const [items, total] = await Promise.all([
-    Subscription.find(filter).sort(sortFrom(q.sort, ['createdAt', 'expiresAt'], '-createdAt')).skip((q.page - 1) * q.limit).limit(q.limit).populate('userId', 'phone').lean(),
+    Subscription.find(filter).sort(sortFrom(q.sort, ['createdAt', 'expiresAt'], '-createdAt')).skip((q.page - 1) * q.limit).limit(q.limit).populate('userId', 'phone').populate('movieId', 'title').lean(),
     Subscription.countDocuments(filter),
   ]);
-  res.json(paged(items.map((s: any) => ({ ...SubscriptionService.view(s), phone: s.userId?.phone, userId: String(s.userId?._id ?? s.userId), note: s.note })), total, q.page, q.limit));
+  res.json(paged(items.map((s: any) => ({ ...adminSubscription(s), phone: s.userId?.phone, userId: String(s.userId?._id ?? s.userId), note: s.note })), total, q.page, q.limit));
 }
 
 export async function extendSubscription(req: Request, res: Response) {

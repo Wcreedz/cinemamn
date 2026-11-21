@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import { env } from '../src/config/env';
 import { Payment, Subscription } from '../src/models';
@@ -6,7 +6,7 @@ import { qpayFee } from '../src/services/subscriptionPricing.service';
 import { BAIGUULLAGIIN_ID, BARILGIIN_ID, parseCheckResponse } from '../src/services/qpay.gateway';
 import { PaymentService } from '../src/services/payment.service';
 import { SubscriptionService } from '../src/services/subscription.service';
-import { api, FakeQPay, login, resetDb, seedMerchant, startDb, stopDb } from './helpers';
+import { api, FakeQPay, login, resetDb, seedMerchant, settleQPayWrites, startDb, stopDb } from './helpers';
 
 const qpay = new FakeQPay();
 const DAY = 86_400_000;
@@ -25,6 +25,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   beforeAll(async () => { await startDb(); await qpay.start(); });
   afterAll(async () => { await qpay.stop(); await stopDb(); });
   beforeEach(async () => { await resetDb(); qpay.reset(); });
+  afterEach(() => settleQPayWrites(qpay));
 
   it('QPay-ийн 1% шимтгэлийг нэмж нэхэмжилж, нийт дүнгээр төлөгдвөл эрх идэвхжинэ', async () => {
     expect([10000, 14900, 3000, 80, 1].map(qpayFee)).toEqual([100, 149, 30, 1, 1]);
@@ -235,7 +236,7 @@ describe('QPay төлбөр (quickqpaypackv2 + тест сервер)', () => {
   it('эрхийн хугацаа дуусмагц хандалтгүй болно, job status-г шинэчилнэ', async () => {
     const { user } = await login().then((user) => ({ user }));
     await Subscription.create({ seq: 1, userId: user.user._id, planCode: 'M', amount: 1, currency: 'MNT', status: 'active', startedAt: new Date(Date.now() - 2 * DAY), expiresAt: new Date(Date.now() - 1000) });
-    expect(await SubscriptionService.hasAccess(user.user._id)).toBe(false);
+    expect(await SubscriptionService.hasAccess(user.user._id, new mongoose.Types.ObjectId())).toBe(false);
     expect(await SubscriptionService.expireDue()).toBe(1);
     expect((await Subscription.findOne({ userId: user.user._id }).lean())!.status).toBe('expired');
   });

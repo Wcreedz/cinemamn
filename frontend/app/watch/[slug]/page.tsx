@@ -147,7 +147,7 @@ export default function WatchPage() {
           <div className="mx-auto max-w-md p-4">
             <ErrorState message={error.message} />
             {(error.code === 'SUBSCRIPTION_REQUIRED' || error.code === 'UNAUTHORIZED') && (
-              <Button asChild className="mt-4 w-full"><Link href={error.code === 'UNAUTHORIZED' ? `/login?next=/watch/${slug}` : '/subscription'}>{error.code === 'UNAUTHORIZED' ? 'Нэвтрэх' : 'Эрх авах'}</Link></Button>
+              <Button asChild className="mt-4 w-full"><Link href={error.code === 'UNAUTHORIZED' ? `/login?next=/watch/${slug}` : `/movies/${slug}`}>{error.code === 'UNAUTHORIZED' ? 'Нэвтрэх' : 'Эрх авах'}</Link></Button>
             )}
           </div>
         </>

@@ -7,14 +7,18 @@ import { SettingsService } from './settings.service';
 const DAY = 86_400_000;
 const MAX_SEQ_RETRIES = 10;
 
-type PeriodFields = Pick<ISubscription, 'planCode' | 'amount' | 'currency'> & Partial<Pick<ISubscription, 'paymentId' | 'grantedBy' | 'note'>>;
+type PeriodFields = Pick<ISubscription, 'planCode' | 'amount' | 'currency'> & Partial<Pick<ISubscription, 'paymentId' | 'grantedBy' | 'note' | 'movieId'>>;
+
+// movieId: null нь талбаргүй (бүх киноны) эрхийг ч олно.
+const scopeOf = (movieId?: Types.ObjectId | null) => ({ movieId: movieId ?? null });
 
 // Идэвхтэй эрх байвал дуусах огнооноос нь, үгүй бол `from`-оос эхэлнэ. Эхлээд дарааллыг уншдаг
 // тул уншсаны дараа нэмэгдсэн эрх (userId, seq) unique индекс дээр мөргөлдөж, дахин тооцоологдоно.
+// Бүх киноны эрх, кино тус бүрийн эрх өөр өөрийн дараалалд сунгагдана: нэг киноны эрх сарын эрхийг хойшлуулахгүй.
 async function insertPeriod(userId: Types.ObjectId, from: Date, days: number, fields: PeriodFields) {
   for (let attempt = 0; attempt < MAX_SEQ_RETRIES; attempt++) {
     const last = await Subscription.findOne({ userId }).sort({ seq: -1 }).select('seq').lean();
-    const latest = await Subscription.findOne({ userId, status: 'active', expiresAt: { $gt: from } }).sort({ expiresAt: -1 }).select('expiresAt').lean();
+    const latest = await Subscription.findOne({ userId, ...scopeOf(fields.movieId), status: 'active', expiresAt: { $gt: from } }).sort({ expiresAt: -1 }).select('expiresAt').lean();
     const startedAt = latest ? latest.expiresAt : from;
     try {
       return await Subscription.create({
@@ -38,6 +42,7 @@ export const SubscriptionService = {
     try {
       const sub = await insertPeriod(payment.userId, paidAt, payment.durationDays, {
         planCode: payment.planCode, amount: paymentPrice(payment), currency: payment.currency, paymentId: payment._id,
+        ...(payment.movieId ? { movieId: payment.movieId } : {}),
       });
       return { sub, created: true };
     } catch (err) {
@@ -54,17 +59,34 @@ export const SubscriptionService = {
     return insertPeriod(userId, new Date(), days, { planCode: 'MANUAL', amount: 0, currency: value.currency, grantedBy: adminId, note });
   },
 
+  // Бүх киноны эрхийн төлөв. Кино тус бүрийн эрхийг movieAccess() буцаана.
   async status(userId: Types.ObjectId, now = new Date()) {
-    const active = await Subscription.find({ userId, status: 'active', expiresAt: { $gt: now } }).sort({ startedAt: 1 }).lean<ISubscription[]>();
+    const active = await Subscription.find({ userId, ...scopeOf(null), status: 'active', expiresAt: { $gt: now } }).sort({ startedAt: 1 }).lean<ISubscription[]>();
     const current = active.find((s) => s.startedAt <= now) ?? null;
     return { current, expiresAt: current ? active[active.length - 1].expiresAt : null };
   },
 
-  // Тоглуулах эрхийн цорын ганц шийдвэр. Дуусах огноог шууд шалгах тул expire job хоцорсон ч нэвтрүүлэхгүй.
-  async hasAccess(userId: Types.ObjectId, now = new Date()) {
+  // Одоо хүчинтэй кино тус бүрийн эрх: кино бүрд сунгалтын дарааллын эцсийн дуусах огноо.
+  async movieAccess(userId: Types.ObjectId, now = new Date()) {
+    const active = await Subscription.find({ userId, movieId: { $type: 'objectId' }, status: 'active', expiresAt: { $gt: now } })
+      .sort({ startedAt: 1 }).select('movieId startedAt expiresAt').lean<ISubscription[]>();
+    const byMovie = new Map<string, { started: boolean; expiresAt: Date }>();
+    for (const s of active) {
+      const key = String(s.movieId);
+      const prev = byMovie.get(key);
+      byMovie.set(key, { started: (prev?.started ?? false) || s.startedAt <= now, expiresAt: prev && prev.expiresAt > s.expiresAt ? prev.expiresAt : s.expiresAt });
+    }
+    return [...byMovie].filter(([, v]) => v.started).map(([movieId, v]) => ({ movieId, expiresAt: v.expiresAt }));
+  },
+
+  // Тоглуулах эрхийн цорын ганц шийдвэр: бүх киноны эрх эсвэл энэ киноны эрх.
+  // Дуусах огноог шууд шалгах тул expire job хоцорсон ч нэвтрүүлэхгүй.
+  async hasAccess(userId: Types.ObjectId, movieId: Types.ObjectId, now = new Date()) {
     const { paymentRequired } = await SettingsService.get('subscription');
     if (!paymentRequired) return true;
-    return !!(await this.status(userId, now)).current;
+    return !!(await Subscription.exists({
+      userId, status: 'active', startedAt: { $lte: now }, expiresAt: { $gt: now }, movieId: { $in: [null, movieId] },
+    }));
   },
 
   async expireDue(now = new Date()) {
@@ -74,7 +96,7 @@ export const SubscriptionService = {
 
   view(s: ISubscription) {
     return {
-      id: String(s._id), planCode: s.planCode, amount: s.amount, currency: s.currency, status: s.status,
+      id: String(s._id), planCode: s.planCode, movieId: s.movieId ? String(s.movieId) : undefined, amount: s.amount, currency: s.currency, status: s.status,
       startedAt: s.startedAt, expiresAt: s.expiresAt, createdAt: s.createdAt,
     };
   },

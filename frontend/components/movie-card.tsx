@@ -4,7 +4,7 @@ import { Clock, Film, Lock, Play } from 'lucide-react';
 import type { MovieSummary } from '@mongolflix/shared';
 import { useApp } from '@/components/providers';
 import { Skeleton } from '@/components/ui/misc';
-import { runtime } from '@/lib/utils';
+import { canWatchMovie, runtime } from '@/lib/utils';
 
 export function Poster({ src, title, className }: { src?: string; title: string; className?: string }) {
   return src
@@ -15,7 +15,7 @@ export function Poster({ src, title, className }: { src?: string; title: string;
 // resume: дуусаагүй киног дэлгэрэнгүй хуудас алгасан шууд тоглуулагч руу нээж, зогссон газраас нь үргэлжлүүлнэ.
 export function MovieCard({ movie, progress, resume, note }: { movie: MovieSummary; progress?: number; resume?: boolean; note?: string }) {
   const { access, settings } = useApp();
-  const locked = settings?.subscription.paymentRequired !== false && !access?.hasAccess;
+  const locked = settings?.subscription.paymentRequired !== false && !canWatchMovie(movie.id, { signedIn: true, access, settings });
   // Хуучин API талбаргүй хариу өгсөн ч бэлэн киног "удахгүй" гэж харуулахгүй: зөвхөн тодорхой false.
   const comingSoon = movie.playable === false;
   const canResume = resume && !comingSoon && !locked;

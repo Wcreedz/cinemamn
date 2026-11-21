@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import type { PaymentView } from '@mongolflix/shared';
@@ -13,8 +13,12 @@ import { useApi } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 import { money } from '@/lib/utils';
 
+// Зөвхөн сайтын киноны хуудас руу буцаана: гаднын холбоос руу шилжүүлэхгүй.
+const movieReturn = (next: string | null) => (next && /^\/movies\/[a-z0-9-]+$/.test(next) ? next : null);
+
 function Pay() {
   const { id } = useParams<{ id: string }>();
+  const back = movieReturn(useSearchParams().get('next'));
   const { refreshUser } = useApp();
   const { data: p, error, loading, reload, setData } = useApi<PaymentView>(`/api/payments/${id}`);
   const [checking, setChecking] = useState(false);
@@ -53,7 +57,7 @@ function Pay() {
         <CheckCircle2 className="mx-auto size-14 text-success" />
         <h1 className="mt-3 text-xl font-black">Төлбөр амжилттай</h1>
         <p className="mt-1 text-sm text-muted-foreground">{p.planName} идэвхжлээ.</p>
-        <Button asChild className="mt-5"><Link href="/">Кино үзэх</Link></Button>
+        <Button asChild className="mt-5"><Link href={back ?? '/'}>Кино үзэх</Link></Button>
       </Card>
     );
   }
@@ -65,7 +69,7 @@ function Pay() {
         <p className="mt-1 text-sm text-muted-foreground">
           {p.failureReason === 'AMOUNT_MISMATCH' ? 'Төлсөн дүн нэхэмжлэхтэй таарсангүй. Админтай холбогдоно уу.' : 'Дахин нэхэмжлэх үүсгэнэ үү.'}
         </p>
-        <Button asChild className="mt-5"><Link href="/subscription">Буцах</Link></Button>
+        <Button asChild className="mt-5"><Link href={back ?? '/subscription'}>Буцах</Link></Button>
       </Card>
     );
   }

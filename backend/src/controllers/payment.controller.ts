@@ -9,9 +9,9 @@ import { createPaymentSchema } from '../validators';
 import { z } from 'zod';
 
 export async function create(req: Request, res: Response) {
-  // Биеээс зөвхөн багцын кодыг уншина: дүн, валют серверийн тохиргооноос тооцогдоно.
-  const { planCode } = parse(createPaymentSchema, req.body);
-  const payment = await PaymentService.create(req.user!._id, planCode);
+  // Биеээс зөвхөн багцын код эсвэл киноны id-г уншина: дүн, валют серверийн тохиргоо, киноны бичлэгээс тооцогдоно.
+  const { planCode, movieId } = parse(createPaymentSchema, req.body);
+  const payment = await PaymentService.create(req.user!._id, { planCode, movieId });
   res.status(201).json(PaymentService.view(payment.toObject() as IPayment));
 }
 

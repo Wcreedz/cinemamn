@@ -82,6 +82,9 @@ const movieSchema = new Schema({
   country: String,
   isPublished: { type: Boolean, default: false },
   featured: { type: Boolean, default: false },
+  // Зөвхөн энэ киног тусад нь худалдаж авах үнэ (шимтгэлгүй). 0 бол тусад нь зарагдахгүй, зөвхөн бүх киноны эрхээр үзнэ.
+  rentalPrice: { type: Number, default: 0, min: 0, validate: { validator: Number.isInteger, message: 'Үнэ бүхэл тоо байх ёстой' } },
+  rentalDays: { type: Number, default: 30, min: 1, max: 365 },
   viewCount: { type: Number, default: 0, min: 0 },
 }, opts('movies'));
 // `language` талбар нь Mongo-гийн text index-ийн override-тай давхцахаас сэргийлж өөр нэр зааж өгөв.
@@ -95,7 +98,7 @@ export const Movie = model('Movie', movieSchema);
 // ---------- Subscription ----------
 export interface ISubscription {
   _id: Types.ObjectId; userId: Types.ObjectId; seq: number; planCode: string; amount: number; currency: string;
-  status: 'pending' | 'active' | 'expired' | 'cancelled'; startedAt: Date; expiresAt: Date;
+  status: 'pending' | 'active' | 'expired' | 'cancelled'; startedAt: Date; expiresAt: Date; movieId?: Types.ObjectId;
   paymentId?: Types.ObjectId; grantedBy?: Types.ObjectId; note?: string; createdAt: Date; updatedAt: Date;
 }
 const subscriptionSchema = new Schema<ISubscription>({
@@ -107,6 +110,8 @@ const subscriptionSchema = new Schema<ISubscription>({
   status: { type: String, enum: ['pending', 'active', 'expired', 'cancelled'], required: true },
   startedAt: { type: Date, required: true },
   expiresAt: { type: Date, required: true },
+  // Байхгүй бол бүх киноны эрх. Байвал зөвхөн энэ кино: сунгалт нь мөн зөвхөн энэ киноны эрхийн дараалалд залгагдана.
+  movieId: { ...ref('Movie'), immutable: true },
   paymentId: ref('Payment'),
   grantedBy: ref('User'),
   note: String,
@@ -123,7 +128,7 @@ export const Subscription = model<ISubscription>('Subscription', subscriptionSch
 export interface IPayment {
   _id: Types.ObjectId; userId: Types.ObjectId; orderNumber: string; invoiceId?: string; paymentId?: string;
   provider: 'qpay'; amount: number; fee?: number; currency: string; planCode: string; planName: string; durationDays: number;
-  pricingVersion: number; qpayBaiguullagiinId: string; qpayBarilgiinId: string;
+  pricingVersion: number; movieId?: Types.ObjectId; qpayBaiguullagiinId: string; qpayBarilgiinId: string;
   status: 'pending' | 'paid' | 'failed' | 'expired' | 'refunded'; failureReason?: string;
   subscriptionId?: Types.ObjectId; paidAt?: Date; verifiedAt?: Date; expiresAt?: Date; lastCheckAt?: Date;
   verificationNote?: string; refundedBy?: Types.ObjectId; refundNote?: string;
@@ -145,6 +150,8 @@ const paymentSchema = new Schema<IPayment>({
   planName: { type: String, required: true, immutable: true },
   durationDays: { type: Number, required: true, min: 1, immutable: true },
   pricingVersion: { type: Number, required: true, immutable: true },
+  // Зөвхөн нэг киноны төлбөр. Байхгүй бол бүх киноны эрхийн багц.
+  movieId: { ...ref('Movie'), immutable: true },
   // Код дахь ID солигдсон ч хүлээгдэж буй нэхэмжлэх үүссэн merchant-аараа шалгагдана.
   qpayBaiguullagiinId: { type: String, required: true, immutable: true },
   qpayBarilgiinId: { type: String, required: true, immutable: true },

@@ -23,20 +23,25 @@ export interface MovieSummary {
 export interface MovieDetail extends MovieSummary {
   originalTitle?: string; trailerUrl?: string; cast: string[]; director?: string; language?: string; country?: string;
   videoStatus: VideoStatus;
+  // Зөвхөн энэ киног худалдаж авах шимтгэлгүй үнэ, хугацаа. Тусад нь зарагдахгүй кинонд байхгүй.
+  rentalPrice?: number; rentalDays?: number;
 }
-export interface AdminMovie extends MovieDetail { isPublished: boolean; videoError?: string; videoProgress?: number; videoUploadSeconds?: number; videoProcessSeconds?: number; videoRetryable?: boolean; videoPlayable: boolean; videoUpload?: { fileName: string; percent: number; stalled: boolean }; createdAt: string; updatedAt: string }
+export interface AdminMovie extends MovieDetail {
+  rentalPrice: number; rentalDays: number; isPublished: boolean; videoError?: string; videoProgress?: number; videoUploadSeconds?: number; videoProcessSeconds?: number; videoRetryable?: boolean; videoPlayable: boolean; videoUpload?: { fileName: string; percent: number; stalled: boolean }; createdAt: string; updatedAt: string }
 
 export interface Plan { code: string; name: string; price: number; currency: string; durationDays: number; enabled: boolean }
 export interface PlansResponse { enabled: boolean; paymentRequired: boolean; currency: string; plans: Plan[]; version: number }
 
 export interface SubscriptionView {
-  id: string; planCode: string; amount: number; currency: string; status: SubscriptionStatus;
+  id: string; planCode: string; movieId?: string; movieTitle?: string; amount: number; currency: string; status: SubscriptionStatus;
   startedAt: string; expiresAt: string; createdAt: string;
 }
-export interface SubscriptionMe { hasAccess: boolean; paymentRequired: boolean; expiresAt: string | null; current: SubscriptionView | null }
+// hasAccess: бүх киноны эрх. movies: зөвхөн тухайн киноны одоо хүчинтэй эрхүүд.
+export interface MovieAccess { movieId: string; expiresAt: string }
+export interface SubscriptionMe { hasAccess: boolean; paymentRequired: boolean; expiresAt: string | null; current: SubscriptionView | null; movies: MovieAccess[] }
 
 export interface PaymentView {
-  id: string; orderNumber: string; planCode: string; planName: string; amount: number; fee?: number; price: number; currency: string; status: PaymentStatus;
+  id: string; orderNumber: string; planCode: string; planName: string; movieId?: string; amount: number; fee?: number; price: number; currency: string; status: PaymentStatus;
   failureReason?: string; paidAt?: string; createdAt: string; expiresAt?: string;
   qr?: { image?: string; text?: string; shortUrl?: string; urls: { name: string; description?: string; logo?: string; link: string }[] };
 }

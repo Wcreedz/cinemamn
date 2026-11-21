@@ -8,8 +8,10 @@ export async function plans(_req: Request, res: Response) {
   res.json(await SubscriptionPricingService.publicPlans());
 }
 export async function mine(req: Request, res: Response) {
-  const [{ paymentRequired }, st] = await Promise.all([SettingsService.get('subscription'), SubscriptionService.status(req.user!._id)]);
-  res.json({ hasAccess: !paymentRequired || !!st.current, paymentRequired, expiresAt: st.expiresAt, current: st.current ? SubscriptionService.view(st.current) : null });
+  const [{ paymentRequired }, st, movies] = await Promise.all([
+    SettingsService.get('subscription'), SubscriptionService.status(req.user!._id), SubscriptionService.movieAccess(req.user!._id),
+  ]);
+  res.json({ hasAccess: !paymentRequired || !!st.current, paymentRequired, expiresAt: st.expiresAt, current: st.current ? SubscriptionService.view(st.current) : null, movies });
 }
 export async function history(req: Request, res: Response) {
   const items = await Subscription.find({ userId: req.user!._id }).sort({ createdAt: -1 }).limit(100).lean<ISubscription[]>();

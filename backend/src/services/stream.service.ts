@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { Movie, PlaybackSession, User, WatchHistory } from '../models';
 import { AppError, forbidden, notFound } from '../utils/errors';
+import { isPlayable } from './playable';
 import { SubscriptionService } from './subscription.service';
 import { VideoConfigurationService } from './videoConfiguration.service';
 
@@ -11,14 +12,13 @@ interface PlaybackClaims { sub: string; mid: string; sid: string }
 // /v/<токен>/<киноны id>/<HLS файл>: HLS-ийн харьцангуй замууд токенийг автоматаар өвлөнө.
 const HLS_FILE = /^(master\.m3u8|\d{3,4}p\/(index\.m3u8|seg_\d{1,6}\.ts))$/;
 
-// Шинэ файл боловсруулагдаж эсвэл бүтэлгүйтсэн ч хуучин HLS дискэнд бүтэн байгаа.
-export const isPlayable = (movie: { videoStatus?: string | null; hlsPath?: string | null }) => movie.videoStatus === 'ready' || !!movie.hlsPath;
+export { isPlayable };
 
 export const StreamService = {
   async grant(userId: Types.ObjectId, movieId: string, ip?: string) {
     const movie = await Movie.findById(movieId).select('+hlsPath').lean();
     if (!movie || !movie.isPublished) throw notFound('Кино олдсонгүй.');
-    if (!(await SubscriptionService.hasAccess(userId))) throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Кино үзэхийн тулд идэвхтэй эрх шаардлагатай.');
+    if (!(await SubscriptionService.hasAccess(userId, movie._id))) throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Кино үзэхийн тулд бүх киноны эрх эсвэл энэ киноны эрх шаардлагатай.');
     if (!isPlayable(movie)) throw new AppError(409, 'VIDEO_NOT_READY', 'Тун удахгүй. Энэ киноны видео бэлтгэгдэж байна.');
     const { playbackTokenExpiryMinutes } = await VideoConfigurationService.get();
     const expiresAt = new Date(Date.now() + playbackTokenExpiryMinutes * 60_000);
@@ -51,7 +51,7 @@ export const StreamService = {
     const [user, movie] = await Promise.all([User.findById(userId).lean(), Movie.findById(movieId).lean()]);
     if (!user || user.status !== 'active') throw forbidden('Бүртгэл идэвхгүй байна.');
     if (!movie?.isPublished) throw forbidden('Кино нийтлэгдээгүй байна.');
-    if (!(await SubscriptionService.hasAccess(userId))) throw forbidden('Идэвхтэй эрх алга байна.');
+    if (!(await SubscriptionService.hasAccess(userId, movie._id))) throw forbidden('Идэвхтэй эрх алга байна.');
     return { movieId, file };
   },
 

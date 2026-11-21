@@ -136,7 +136,9 @@ function SaveProgress({ task }: { task: SaveTask }) {
   );
 }
 
-const blank = { title: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true };
+// Үнэ хоосон бол тусад нь зарагдахгүй: зөвхөн бүх киноны эрхээр үзнэ.
+const blank = { title: '', description: '', poster: '', backdrop: '', trailerUrl: '', genres: [] as string[], isPublished: true, rentalPrice: '', rentalDays: '30' };
+const wholeNumber = (v: string) => (v.trim() === '' ? 0 : Number(v));
 
 export const deleteQuestion = (title: string) => `"${title}" киног устгах уу?`;
 export const DELETE_DETAIL = 'Кино файл, зураг, үзсэн түүх устаж, буцаах боломжгүй.';
@@ -148,6 +150,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     ...blank, title: movie.title, isPublished: movie.isPublished,
     poster: movie.poster ?? '', backdrop: movie.backdrop ?? '', trailerUrl: movie.trailerUrl ?? '',
     description: movie.description ?? '', genres: movie.genres.map((g) => g.id),
+    rentalPrice: movie.rentalPrice ? String(movie.rentalPrice) : '', rentalDays: String(movie.rentalDays ?? 30),
   } : blank);
   // Файл байршуулахад алдаа гарвал дахин дарахад шинэ кино биш, энэ кино шинэчлэгдэнэ.
   const [created, setCreated] = useState<AdminMovie | null>(null);
@@ -237,6 +240,7 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
     const body = {
       title: f.title, description: f.description, poster: f.poster, backdrop: f.backdrop,
       trailerUrl: f.trailerUrl, genres: f.genres, isPublished: f.isPublished,
+      rentalPrice: wholeNumber(f.rentalPrice), rentalDays: wholeNumber(f.rentalDays) || 30,
     };
     try {
       let saved = current;
@@ -356,6 +360,14 @@ export function MovieForm({ movie, onChanged }: { movie?: AdminMovie; onChanged?
               <Button type="button" variant="destructive" className="w-full" disabled={busy}>{deleting ? 'Устгаж байна…' : 'Киног устгах'}</Button>
             </Confirm>
           )}
+        </Panel>
+        <Panel className="space-y-4">
+          <div>
+            <h2 className="font-bold">Зөвхөн энэ киноны үнэ</h2>
+            <p className="text-xs text-muted-foreground">Үзэгч бүх киноны эрх эсвэл зөвхөн энэ киног худалдаж авч, хугацаа дуусахад сунгана. Хоосон бол тусад нь зарагдахгүй.</p>
+          </div>
+          <Field label="Үнэ (₮)"><Input type="number" inputMode="numeric" min={0} step={1} placeholder="Жишээ нь 3000" value={f.rentalPrice} onChange={(e) => set('rentalPrice', e.target.value)} /></Field>
+          <Field label="Үзэх хугацаа (хоног)"><Input type="number" inputMode="numeric" min={1} max={365} step={1} required={f.rentalPrice.trim() !== ''} value={f.rentalDays} onChange={(e) => set('rentalDays', e.target.value)} /></Field>
         </Panel>
         <Panel className="space-y-4">
           <ImageField label="Постер" src={f.poster} file={images.poster} disabled={busy} previewClass="h-32" onPick={(file) => setImages((s) => ({ ...s, poster: file }))} onRemove={() => removeImage('poster')} />
