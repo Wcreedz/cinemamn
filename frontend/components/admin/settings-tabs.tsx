@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { PublicUser } from '@mongolflix/shared';
@@ -97,7 +98,9 @@ export function SubscriptionTab({ entry, reload }: { entry: Entry<Subscription>;
         <Toggle label="Эрх худалдаалах" hint="Унтраавал шинэ нэхэмжлэх үүсэхгүй." checked={f.enabled} onChange={(v) => setForm({ ...f, enabled: v })} />
       </Panel>
       <Panel className="space-y-4">
-        <h2 className="font-bold">Багцууд</h2>
+        <h2 className="font-bold">Бүх киноны эрхийн багцууд</h2>
+        {/* Нэг киноны багцыг энд нэмбэл бүх киноны эрх зарагдана: андуурахаас сэргийлнэ. */}
+        <Notice tone="warning">Энд нэмсэн багц бүр <b>бүх киног</b> үзэх эрх өгнө. Зөвхөн нэг киноны үнэ, үзэх хоногийг <Link className="underline" href="/admin/movies">Кино</Link> → тухайн киноны засах хуудасны &quot;Зөвхөн энэ киноны үнэ&quot; хэсгээс оруулна.</Notice>
         <Notice>Үнэ, хугацааг өөрчлөхөд зөвхөн шинэ нэхэмжлэхэд хүчинтэй. Хүлээгдэж буй нэхэмжлэх анхны дүнгээрээ, идэвхтэй эрх анхны дуусах огноогоороо үлдэнэ.</Notice>
         {f.plans.map((p, i) => (
           <div key={i} className="grid items-end gap-3 rounded-lg border p-3 sm:grid-cols-[8rem_1fr_8rem_7rem_auto_auto]">

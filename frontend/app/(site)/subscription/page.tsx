@@ -50,7 +50,8 @@ function Content() {
       </Card>
       {error && <Notice tone="danger">{error}</Notice>}
       <section aria-label="Багцууд">
-        <h2 className="mb-3 text-lg font-bold">Багц сонгох</h2>
+        <h2 className="mb-3 text-lg font-bold">Бүх киноны эрх</h2>
+        <p className="-mt-2 mb-3 text-sm text-muted-foreground">Зөвхөн нэг кино үзэх бол тухайн киноны хуудаснаас &quot;Зөвхөн энэ кино&quot; товчийг дарна.</p>
         {plans.loading ? <Skeleton className="h-44 max-w-sm" /> : plans.data?.enabled === false ? <Notice tone="warning">Эрх худалдан авах боломж одоогоор хаалттай байна.</Notice> : (
           <div className="grid gap-4 md:grid-cols-3">
             {plans.data?.plans.map((p) => (
